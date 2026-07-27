@@ -48,6 +48,25 @@ For Chrome Beta, register that browser explicitly:
 open-browser-use setup --browser chrome-beta
 ```
 
+For Microsoft Edge (Stable), register that browser explicitly:
+
+```sh
+open-browser-use setup --browser edge
+```
+
+Edge no longer reliably allows installing extensions from the Chrome Web
+Store (Microsoft removed the "allow extensions from other stores" toggle in
+stable Edge in late 2025), so `setup --browser edge` is best-effort: it still
+registers the native messaging host and attempts the External Extensions
+registration, but the extension install itself may not take effect. The
+command's output calls this out explicitly. Prefer the beta path below for
+Edge unless the store-based install is confirmed to work in the user's
+environment:
+
+```sh
+open-browser-use setup beta --browser edge
+```
+
 For BitBrowser, install or load the extension in the target BitBrowser instance,
 then register the native host manifest into that instance's user-data directory:
 
@@ -66,7 +85,10 @@ open-browser-use setup beta
 
 This downloads the latest keyed `open-browser-use-chrome-extension-*.zip` from GitHub Releases and registers the native host for that stable extension id. It opens `chrome://extensions/` and reveals the ZIP in Finder or the system file manager only when the browser extension is missing or older than the CLI-expected version. Ask the user to enable Developer mode and drag that ZIP into the Chrome extensions page when setup prints that next step.
 
-For Chrome Beta, use `open-browser-use setup beta --browser chrome-beta`.
+For Chrome Beta, use `open-browser-use setup beta --browser chrome-beta`. For
+Edge, use `open-browser-use setup beta --browser edge`; unlike
+`setup --browser edge`, this path does not depend on any extension store and
+works the same way as it does for Chrome.
 
 Repair only the native host manifest:
 
@@ -74,8 +96,8 @@ Repair only the native host manifest:
 open-browser-use install-manifest
 ```
 
-Use `--browser chrome-beta` or `--browser <bitbrowser-instance-id>` to repair a
-non-default browser.
+Use `--browser chrome-beta`, `--browser edge`, or
+`--browser <bitbrowser-instance-id>` to repair a non-default browser.
 
 Print the manifest without installing:
 
@@ -87,7 +109,9 @@ open-browser-use manifest
 
 - macOS and Windows can require the user to approve or enable the extension after Chrome sees it.
 - Linux external extension registration can require elevated permissions depending on Chrome installation paths.
-- Chrome native messaging host name is `com.ifuryst.open_browser_use.extension`.
+- Chrome native messaging host name is `com.ifuryst.open_browser_use.extension`. Edge uses the same host name and the same `chrome-extension://` origin scheme, since Edge is Chromium-based.
+- Edge is supported on Stable only (no Beta/Dev/Canary channel) on macOS, Windows, and Linux for profile discovery and native messaging manifest installation. External Extensions auto-install on Edge is best-effort only; see "Set Up A Browser" above.
+- On Linux, only Chrome and Edge have full `--browser` selector support (profile roots, native messaging manifest, and External Extensions paths). Chrome Beta and BitBrowser are not yet supported on Linux.
 - The default socket registry is under `/tmp/open-browser-use/` on Unix-like systems.
 
 ## Verification

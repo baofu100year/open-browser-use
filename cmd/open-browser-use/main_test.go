@@ -216,6 +216,206 @@ func TestCobraInstallManifestSupportsChromeBeta(t *testing.T) {
 	}
 }
 
+func TestCobraInstallManifestSupportsEdge(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Edge manifest path test uses macOS browser roots")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	targetPath := filepath.Join(t.TempDir(), "open-browser-use")
+	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newRootCommand()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"install-manifest", "--browser", "edge", "--path", targetPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(home, "Library/Application Support/Microsoft Edge/NativeMessagingHosts", host.NativeHostName+".json")
+	if strings.TrimSpace(output.String()) != want {
+		t.Fatalf("expected Edge manifest path %q, got %q", want, strings.TrimSpace(output.String()))
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDefaultNativeHostManifestPathForBrowserLinuxSelectsEdge(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	chromePath, err := defaultNativeHostManifestPathForBrowser("chrome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	edgePath, err := defaultNativeHostManifestPathForBrowser("edge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chromePath == edgePath {
+		t.Fatalf("expected distinct manifest paths for chrome vs edge, got %q for both", chromePath)
+	}
+	if runtime.GOOS == "linux" {
+		wantChrome := filepath.Join(home, ".config/google-chrome/NativeMessagingHosts", host.NativeHostName+".json")
+		wantEdge := filepath.Join(home, ".config/microsoft-edge/NativeMessagingHosts", host.NativeHostName+".json")
+		if chromePath != wantChrome {
+			t.Fatalf("expected chrome manifest path %q, got %q", wantChrome, chromePath)
+		}
+		if edgePath != wantEdge {
+			t.Fatalf("expected edge manifest path %q, got %q", wantEdge, edgePath)
+		}
+	}
+	defaultPath, err := defaultNativeHostManifestPathForBrowser("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultPath != chromePath {
+		t.Fatalf("expected empty browser selector to default to chrome path %q, got %q", chromePath, defaultPath)
+	}
+}
+
+func TestDefaultChromeExternalExtensionPathForBrowserLinuxSelectsEdge(t *testing.T) {
+	chromePath, err := defaultChromeExternalExtensionPathForBrowser(defaultChromeExtensionID, "chrome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	edgePath, err := defaultChromeExternalExtensionPathForBrowser(defaultChromeExtensionID, "edge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chromePath == edgePath {
+		t.Fatalf("expected distinct external extension paths for chrome vs edge, got %q for both", chromePath)
+	}
+	if runtime.GOOS == "linux" {
+		wantChrome := filepath.Join("/opt/google/chrome/extensions", defaultChromeExtensionID+".json")
+		wantEdge := filepath.Join("/opt/microsoft/msedge/extensions", defaultChromeExtensionID+".json")
+		if chromePath != wantChrome {
+			t.Fatalf("expected chrome external extension path %q, got %q", wantChrome, chromePath)
+		}
+		if edgePath != wantEdge {
+			t.Fatalf("expected edge external extension path %q, got %q", wantEdge, edgePath)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		wantChrome := `HKCU\Software\Google\Chrome\Extensions\` + defaultChromeExtensionID
+		wantEdge := `HKCU\Software\Microsoft\Edge\Extensions\` + defaultChromeExtensionID
+		if chromePath != wantChrome {
+			t.Fatalf("expected chrome external extension registry key %q, got %q", wantChrome, chromePath)
+		}
+		if edgePath != wantEdge {
+			t.Fatalf("expected edge external extension registry key %q, got %q", wantEdge, edgePath)
+		}
+	}
+	defaultPath, err := defaultChromeExternalExtensionPathForBrowser(defaultChromeExtensionID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultPath != chromePath {
+		t.Fatalf("expected empty browser selector to default to chrome path %q, got %q", chromePath, defaultPath)
+	}
+}
+
+func TestWindowsRegistryBrowserVendorProduct(t *testing.T) {
+	cases := []struct {
+		selector string
+		want     string
+	}{
+		{"", `Google\Chrome`},
+		{"chrome", `Google\Chrome`},
+		{"chrome-beta", `Google\Chrome`},
+		{"edge", `Microsoft\Edge`},
+		{"Microsoft Edge", `Microsoft\Edge`},
+	}
+	for _, tc := range cases {
+		got, err := windowsRegistryBrowserVendorProduct(tc.selector)
+		if err != nil {
+			t.Fatalf("selector %q: unexpected error %v", tc.selector, err)
+		}
+		if got != tc.want {
+			t.Errorf("selector %q -> %q, want %q", tc.selector, got, tc.want)
+		}
+	}
+	if _, err := windowsRegistryBrowserVendorProduct("bitbrowser"); err == nil {
+		t.Fatal("expected error for unsupported browser selector")
+	}
+}
+
+func TestMacOSBrowserAppName(t *testing.T) {
+	cases := []struct {
+		selector string
+		want     string
+	}{
+		{"", "Google Chrome"},
+		{"chrome", "Google Chrome"},
+		{"chrome-beta", "Google Chrome Beta"},
+		{"edge", "Microsoft Edge"},
+		{"Microsoft Edge", "Microsoft Edge"},
+		{"bitbrowser", "Google Chrome"},
+	}
+	for _, tc := range cases {
+		if got := macOSBrowserAppName(tc.selector); got != tc.want {
+			t.Errorf("selector %q -> %q, want %q", tc.selector, got, tc.want)
+		}
+	}
+}
+
+func TestListInstalledChromeProfilesIncludesEdge(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("multi-browser discovery test uses macOS browser roots")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeEdgeExtensionManifest(t, home, "Default", "0.1.36")
+	writeLocalStateAtRoot(t, edgeRootForTest(home), `{"profile":{"info_cache":{"Default":{"name":"Work"}}}}`)
+
+	profiles, err := listInstalledChromeProfiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]installedChromeProfile{}
+	for _, profile := range profiles {
+		got[profile.Target] = profile
+	}
+	edgeProfile, ok := got["edge:Default"]
+	if !ok {
+		t.Fatalf("expected edge:Default in profiles: %+v", profiles)
+	}
+	if edgeProfile.BrowserName != "Microsoft Edge" {
+		t.Fatalf("expected Microsoft Edge browser name, got %+v", edgeProfile)
+	}
+}
+
+func TestCobraSetupBrowserEdgeMentionsBestEffort(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("stable native host link is not implemented on windows and Edge root test uses macOS browser roots")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	targetPath := filepath.Join(t.TempDir(), "open-browser-use")
+	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	externalPath := filepath.Join(t.TempDir(), defaultChromeExtensionID+".json")
+
+	cmd := newRootCommand()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"setup", "--browser", "edge", "--path", targetPath, "--external-extension-output", externalPath, "--no-open"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "best-effort") {
+		t.Fatalf("expected setup output to mention best-effort Edge caveat, got %q", output.String())
+	}
+	if !strings.Contains(output.String(), "setup beta --browser edge") {
+		t.Fatalf("expected setup output to point to setup beta for Edge, got %q", output.String())
+	}
+}
+
 func TestInstallChromeExternalExtensionWritesWebStoreHint(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), defaultChromeExtensionID+".json")
 	path, err := installChromeExternalExtension("", outputPath)
@@ -435,6 +635,18 @@ func chromeRootForTest(home string) string {
 
 func chromeBetaRootForTest(home string) string {
 	return filepath.Join(home, "Library/Application Support/Google/Chrome Beta")
+}
+
+func edgeRootForTest(home string) string {
+	if runtime.GOOS == "linux" {
+		return filepath.Join(home, ".config/microsoft-edge")
+	}
+	return filepath.Join(home, "Library/Application Support/Microsoft Edge")
+}
+
+func writeEdgeExtensionManifest(t *testing.T, home, profileDir, extensionVersion string) {
+	t.Helper()
+	writeExtensionManifestAtRoot(t, edgeRootForTest(home), profileDir, defaultChromeExtensionID, extensionVersion)
 }
 
 func bitBrowserRootForTest(home, instance string) string {

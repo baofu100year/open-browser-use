@@ -41,7 +41,7 @@ Open Browser Use connects an MV3 Chrome extension, a local native messaging host
 ## Browser and profile handling
 
 Some users run several supported browsers (for example Google Chrome, Google
-Chrome Beta, or BitBrowser) and may also have multiple profiles inside them. If
+Chrome Beta, Microsoft Edge, or BitBrowser) and may also have multiple profiles inside them. If
 more than one browser/profile target has the Open Browser Use extension
 installed, the agent must decide which target this task should operate on rather
 than silently picking whatever window happens to be active.
@@ -56,7 +56,7 @@ than silently picking whatever window happens to be active.
    `Profile 1`), `DISPLAY NAME` (what the user sees in the browser avatar
    menu), `VERSION`, and `CONNECTED` (whether that target's host is currently
    reachable). JSON output is available via `--json` and includes a stable
-   `target` such as `chrome:Default`, `chrome-beta:Default`, or
+   `target` such as `chrome:Default`, `chrome-beta:Default`, `edge:Default`, or
    `bitbrowser:<instance>:Default`.
 
 2. If exactly one target is installed and connected, proceed without asking.
@@ -74,11 +74,14 @@ than silently picking whatever window happens to be active.
 
 5. After the user has chosen, pass `--browser <selector>` and, when needed,
    `--profile <selector>` to every CLI / MCP command for the rest of the task.
-   Browser selectors accept ids such as `chrome`, `chrome-beta`, `bitbrowser`,
-   browser display names, or a BitBrowser instance id. Profile selectors accept
-   either the directory name (`Default`, `Profile 1`) or the display name
-   (`Eva`, `cookiy.com`), case-insensitive. Do not switch browser/profile
-   mid-task.
+   Browser selectors accept ids such as `chrome`, `chrome-beta`, `edge`,
+   `bitbrowser`, browser display names, or a BitBrowser instance id. Profile
+   selectors accept either the directory name (`Default`, `Profile 1`) or the
+   display name (`Eva`, `cookiy.com`), case-insensitive. Do not switch
+   browser/profile mid-task. Edge support is newer and best-effort for the
+   Chrome-Web-Store-based install path; see
+   [references/installation.md](references/installation.md) for the Edge
+   setup caveat.
 
 6. If `--browser` / `--profile` does not match any running host, the CLI prints
    which targets are currently connected. Ask the user to open the chosen

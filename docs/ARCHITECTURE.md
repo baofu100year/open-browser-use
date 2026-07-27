@@ -166,22 +166,35 @@ dot；hyphen 版本 `com.ifuryst.open-computer-use.extension` 会被
   `finalize-tabs`、`name-session`、`cdp`、`move-mouse`、
   `wait-file-chooser`、`set-file-chooser-files`、`turn-ended`、`profiles`。
 - Multi-browser / multi-profile 支持：`open-browser-use profiles` 扫描 Chrome
-  Stable、Chrome Beta 和 BitBrowser user-data roots，在每个 profile 目录中
-  通过 CRX 与 unpacked 两条路径找到已经装好插件的 profile，附带 browser id、
-  browser display name、profile directory 和展示名（来自
-  `Local State.profile.info_cache`）。所有面向用户的命令支持
-  `--browser <chrome|chrome-beta|bitbrowser|displayName|instance>` 和
-  `--profile <directory|displayName>`：CLI 枚举 `socket-dir` 下的 `.sock`
+  Stable、Chrome Beta、Microsoft Edge（Stable，Chromium 内核，与 Chrome 共享
+  `chrome-extension://` origin scheme 和 CRX id 算法）和 BitBrowser
+  user-data roots，在每个 profile 目录中通过 CRX 与 unpacked 两条路径找到
+  已经装好插件的 profile，附带 browser id、browser display name、profile
+  directory 和展示名（来自 `Local State.profile.info_cache`）。所有面向用户
+  的命令支持 `--browser <chrome|chrome-beta|edge|bitbrowser|displayName|instance>`
+  和 `--profile <directory|displayName>`：CLI 枚举 `socket-dir` 下的 `.sock`
   文件，对每个连通的 socket 调用 `getInfo`，把
   `metadata.extensionInstanceId` 反查到 browser/profile（grep 每个支持 browser
   root 的 `Local Extension Settings/<extension-id>/*.{log,ldb}`），按 selector
   选出匹配 socket。`obu mcp --browser ... --profile ...` 在 MCP server 启动时锁定
   selector，每次工具调用复用同一个解析结果。selector 不匹配时 CLI 列出当前已连通
   target 列表，提示用户打开对应 browser/profile。Windows 当前覆盖 Chrome
-  Stable 和 Chrome Beta 的 `%LOCALAPPDATA%\Google\...\User Data` roots；BitBrowser
-  root 仍只在 macOS 路径中自动发现。未显式选择时仍保留
+  Stable、Chrome Beta 和 Edge 的 `%LOCALAPPDATA%\{Google,Microsoft}\...\User Data`
+  roots（native messaging 和 external extension 的 registry key vendor/product
+  前缀按 browser id 查表：`chrome`/`chrome-beta` -> `Google\Chrome`，
+  `edge` -> `Microsoft\Edge`）；BitBrowser root 仍只在 macOS 路径中自动发现。
+  Linux 目前只有 Chrome 和 Edge 的 root/native-messaging/external-extension
+  路径按 selector 派生（`~/.config/google-chrome` 与
+  `~/.config/microsoft-edge`，external extension 分别落在
+  `/opt/google/chrome/extensions` 与 `/opt/microsoft/msedge/extensions`），
+  Chrome Beta 和 BitBrowser 在 Linux 上仍是已知缺口（见
+  `docs/exec-plans/tech-debt-tracker.md`）。未显式选择时仍保留
   `active.json` 快速路径；`active.json` 缺失或失效时，CLI 会扫描 socket 目录并
-  修复 registry，因此不需要重装扩展。
+  修复 registry，因此不需要重装扩展。Edge 的 Chrome-Web-Store 风格
+  External Extensions 自动安装是 best-effort：`setup --browser edge` 仍会
+  尝试写入注册信息，但由于 Edge 在 2025 年底收紧了"允许从其他商店安装扩展"
+  开关，不保证生效，输出会提示改用 `setup beta --browser edge`
+  （下载 keyed unpacked/ZIP，走开发者模式手动加载，不依赖任何商店基础设施）。
 - MV3 extension core handlers：`getInfo`、`createTab`、`getTabs`、
   `getUserTabs`、`getUserHistory`、`claimUserTab`、`finalizeTabs`、
   `nameSession`、`attach`、`detach`、`executeCdp`、`moveMouse`、

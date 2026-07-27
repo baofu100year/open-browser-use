@@ -154,7 +154,7 @@ func newSetupCommand() *cobra.Command {
 			status := detectBrowserExtensionForBrowser(host.DefaultSocketDir, 700*time.Millisecond, browser)
 			shouldOpenStore := shouldOpenStoreSetup(status, noOpen)
 			if shouldOpenStore {
-				if err := openChromeWebStorePage(); err != nil {
+				if err := openChromeWebStorePage(browser); err != nil {
 					result.StoreOpenError = err.Error()
 				} else {
 					result.OpenedStore = true
@@ -166,7 +166,7 @@ func newSetupCommand() *cobra.Command {
 	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&externalExtensionOutput, "external-extension-output", "", "Chrome external extension JSON output path")
-	cmd.Flags().StringVar(&browser, "browser", "", "browser to register with Chrome Web Store setup (chrome or chrome-beta)")
+	cmd.Flags().StringVar(&browser, "browser", "", "browser to register with Chrome Web Store setup (chrome, chrome-beta, or edge; edge is best-effort)")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "register Chrome integration without opening the Chrome Web Store page")
 	cmd.AddCommand(newSetupBetaCommand())
 	return cmd
@@ -224,7 +224,7 @@ func newSetupBetaCommand() *cobra.Command {
 			status.UpgradeCommand = status.InstallCommand
 			shouldOpen := shouldOpenManualSetup(status, noOpen)
 			if shouldOpen {
-				if err := openChromeExtensionsPage(); err != nil {
+				if err := openChromeExtensionsPage(browser); err != nil {
 					return err
 				}
 				if err := revealFile(installZIPPath); err != nil {
@@ -246,7 +246,7 @@ func newSetupBetaCommand() *cobra.Command {
 	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&zipPath, "zip", "", "existing extension zip path; defaults to the latest GitHub Release zip")
-	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, bitbrowser, or BitBrowser instance id)")
+	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
 	cmd.Flags().BoolVar(&noOpen, "no-open", false, "download and unpack the extension without opening Chrome")
 	return cmd
 }
@@ -292,7 +292,7 @@ func newInstallManifestCommand() *cobra.Command {
 	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&outputPath, "output", "", "native host manifest output path")
-	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, bitbrowser, or BitBrowser instance id)")
+	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
 	return cmd
 }
 
@@ -334,7 +334,11 @@ func installNativeManifestForBrowser(extensionID string, binaryPath string, outp
 		return "", err
 	}
 	if outputPath == "" && runtime.GOOS == "windows" {
-		key := `HKCU\Software\Google\Chrome\NativeMessagingHosts\` + host.NativeHostName
+		vendorProduct, err := windowsRegistryBrowserVendorProduct(browserSelector)
+		if err != nil {
+			return "", err
+		}
+		key := `HKCU\Software\` + vendorProduct + `\NativeMessagingHosts\` + host.NativeHostName
 		if err := regAddDefaultString(key, path); err != nil {
 			return "", fmt.Errorf("failed to register native messaging host %q: %w", key, err)
 		}
@@ -349,6 +353,7 @@ type setupResult struct {
 	OpenedStore           bool
 	StoreOpenError        string
 	SkillUpdate           skillUpdateStatus
+	BestEffortNote        string
 }
 
 type manualSetupResult struct {
@@ -392,11 +397,20 @@ func setupChrome(extensionID string, binaryPath string, externalExtensionOutput 
 	if err != nil {
 		return setupResult{}, err
 	}
+	setupTarget := strings.TrimSpace(browserSelector)
+	if setupTarget == "" {
+		setupTarget = "chrome"
+	}
+	var bestEffortNote string
+	if browserSelectorMatches(setupTarget, connectedProfileInfo{Browser: "edge", BrowserName: "Microsoft Edge"}) {
+		bestEffortNote = "Edge no longer reliably allows installing extensions from the Chrome Web Store; this registration is best-effort and may not take effect. If the extension does not appear, use `open-browser-use setup beta --browser edge` instead."
+	}
 	return setupResult{
 		NativeManifestPath:    manifestPath,
 		ExternalExtensionPath: extensionPath,
 		StoreURL:              chromeWebStoreExtensionURL,
 		SkillUpdate:           maybeUpdateInstalledSkill(),
+		BestEffortNote:        bestEffortNote,
 	}, nil
 }
 
@@ -449,6 +463,9 @@ func renderStoreSetupResult(writer io.Writer, result setupResult, status browser
 	}
 	fmt.Fprintf(writer, "4. 🧩 Browser extension\n   %s\n", status.summaryForSetup("Not installed yet. Install or enable it from the Chrome Web Store page."))
 	renderSkillUpdateResult(writer, result.SkillUpdate)
+	if result.BestEffortNote != "" {
+		fmt.Fprintf(writer, "⚠️ %s\n", result.BestEffortNote)
+	}
 	fmt.Fprintln(writer)
 	if status.isReady() {
 		fmt.Fprintln(writer, "All set. Browser extension is installed, connected, and on the expected version.")
@@ -1054,7 +1071,11 @@ func installChromeExternalExtensionForBrowser(extensionID string, outputPath str
 		allowedExtensionID = defaultChromeExtensionID
 	}
 	if runtime.GOOS == "windows" && outputPath == "" {
-		key := `HKCU\Software\Google\Chrome\Extensions\` + allowedExtensionID
+		vendorProduct, err := windowsRegistryBrowserVendorProduct(browserSelector)
+		if err != nil {
+			return "", err
+		}
+		key := `HKCU\Software\` + vendorProduct + `\Extensions\` + allowedExtensionID
 		if err := regAddString(key, "update_url", chromeWebStoreUpdateURL); err != nil {
 			return "", fmt.Errorf("failed to register Chrome external extension %q: %w", key, err)
 		}
@@ -1535,6 +1556,11 @@ func supportedBrowserProfileRoots() ([]browserProfileRoot, error) {
 				BrowserName: "Google Chrome Beta",
 				Root:        filepath.Join(home, "Library/Application Support/Google/Chrome Beta"),
 			},
+			{
+				BrowserID:   "edge",
+				BrowserName: "Microsoft Edge",
+				Root:        filepath.Join(home, "Library/Application Support/Microsoft Edge"),
+			},
 		}
 		bitBrowserRoots, err := bitBrowserProfileRoots(home)
 		if err != nil {
@@ -1543,11 +1569,18 @@ func supportedBrowserProfileRoots() ([]browserProfileRoot, error) {
 		roots = append(roots, bitBrowserRoots...)
 		return roots, nil
 	case "linux":
-		return []browserProfileRoot{{
-			BrowserID:   "chrome",
-			BrowserName: "Google Chrome",
-			Root:        filepath.Join(home, ".config/google-chrome"),
-		}}, nil
+		return []browserProfileRoot{
+			{
+				BrowserID:   "chrome",
+				BrowserName: "Google Chrome",
+				Root:        filepath.Join(home, ".config/google-chrome"),
+			},
+			{
+				BrowserID:   "edge",
+				BrowserName: "Microsoft Edge",
+				Root:        filepath.Join(home, ".config/microsoft-edge"),
+			},
+		}, nil
 	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if strings.TrimSpace(localAppData) == "" {
@@ -1563,6 +1596,11 @@ func supportedBrowserProfileRoots() ([]browserProfileRoot, error) {
 				BrowserID:   "chrome-beta",
 				BrowserName: "Google Chrome Beta",
 				Root:        filepath.Join(localAppData, "Google", "Chrome Beta", "User Data"),
+			},
+			{
+				BrowserID:   "edge",
+				BrowserName: "Microsoft Edge",
+				Root:        filepath.Join(localAppData, "Microsoft", "Edge", "User Data"),
 			},
 		}, nil
 	default:
@@ -2819,12 +2857,20 @@ func defaultChromeExternalExtensionPathForBrowser(extensionID string, browserSel
 		}
 		return filepath.Join(root.Root, "External Extensions", filename), nil
 	case "linux":
+		linuxTarget := strings.TrimSpace(browserSelector)
+		if linuxTarget == "" {
+			linuxTarget = "chrome"
+		}
+		if browserSelectorMatches(linuxTarget, connectedProfileInfo{Browser: "edge", BrowserName: "Microsoft Edge"}) {
+			return filepath.Join("/opt/microsoft/msedge/extensions", filename), nil
+		}
 		return filepath.Join("/opt/google/chrome/extensions", filename), nil
 	case "windows":
-		if strings.TrimSpace(browserSelector) != "" && !browserSelectorMatches(browserSelector, connectedProfileInfo{Browser: "chrome", BrowserName: "Google Chrome"}) {
-			return "", fmt.Errorf("Chrome external extension setup is not implemented for browser selector %q on %s", browserSelector, runtime.GOOS)
+		vendorProduct, err := windowsRegistryBrowserVendorProduct(browserSelector)
+		if err != nil {
+			return "", err
 		}
-		return `HKCU\Software\Google\Chrome\Extensions\` + strings.TrimSpace(extensionID), nil
+		return `HKCU\Software\` + vendorProduct + `\Extensions\` + strings.TrimSpace(extensionID), nil
 	default:
 		return "", fmt.Errorf("Chrome external extension setup is not implemented for %s", runtime.GOOS)
 	}
@@ -2891,6 +2937,13 @@ func defaultNativeHostManifestPathForBrowser(browserSelector string) (string, er
 		}
 		return filepath.Join(root.Root, "NativeMessagingHosts", filename), nil
 	case "linux":
+		linuxTarget := strings.TrimSpace(browserSelector)
+		if linuxTarget == "" {
+			linuxTarget = "chrome"
+		}
+		if browserSelectorMatches(linuxTarget, connectedProfileInfo{Browser: "edge", BrowserName: "Microsoft Edge"}) {
+			return filepath.Join(home, ".config/microsoft-edge/NativeMessagingHosts", filename), nil
+		}
 		return filepath.Join(home, ".config/google-chrome/NativeMessagingHosts", filename), nil
 	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
@@ -2939,6 +2992,27 @@ func browserRootForInstallSelector(selector string) (browserProfileRoot, error) 
 		return browserProfileRoot{}, fmt.Errorf("browser selector %q is ambiguous; use one of: %s", selector, strings.Join(labels, ", "))
 	}
 	return matches[0], nil
+}
+
+func windowsRegistryBrowserVendorProduct(browserSelector string) (string, error) {
+	target := strings.TrimSpace(browserSelector)
+	if target == "" {
+		target = "chrome"
+	}
+	candidates := []struct {
+		info    connectedProfileInfo
+		product string
+	}{
+		{connectedProfileInfo{Browser: "chrome", BrowserName: "Google Chrome"}, `Google\Chrome`},
+		{connectedProfileInfo{Browser: "chrome-beta", BrowserName: "Google Chrome Beta"}, `Google\Chrome`},
+		{connectedProfileInfo{Browser: "edge", BrowserName: "Microsoft Edge"}, `Microsoft\Edge`},
+	}
+	for _, candidate := range candidates {
+		if browserSelectorMatches(target, candidate.info) {
+			return candidate.product, nil
+		}
+	}
+	return "", fmt.Errorf("Windows registry integration is not implemented for browser selector %q", browserSelector)
 }
 
 func downloadLatestReleaseZIP() (string, error) {
@@ -3347,11 +3421,25 @@ func revealFile(path string) error {
 	return cmd.Process.Release()
 }
 
-func openChromeExtensionsPage() error {
+func macOSBrowserAppName(browserSelector string) string {
+	target := strings.TrimSpace(browserSelector)
+	if target == "" {
+		target = "chrome"
+	}
+	if browserSelectorMatches(target, connectedProfileInfo{Browser: "edge", BrowserName: "Microsoft Edge"}) {
+		return "Microsoft Edge"
+	}
+	if browserSelectorMatches(target, connectedProfileInfo{Browser: "chrome-beta", BrowserName: "Google Chrome Beta"}) {
+		return "Google Chrome Beta"
+	}
+	return "Google Chrome"
+}
+
+func openChromeExtensionsPage(browserSelector string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", "-a", "Google Chrome", "chrome://extensions/")
+		cmd = exec.Command("open", "-a", macOSBrowserAppName(browserSelector), "chrome://extensions/")
 	case "linux":
 		cmd = exec.Command("xdg-open", "chrome://extensions/")
 	case "windows":
@@ -3365,11 +3453,11 @@ func openChromeExtensionsPage() error {
 	return cmd.Process.Release()
 }
 
-func openChromeWebStorePage() error {
+func openChromeWebStorePage(browserSelector string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", "-a", "Google Chrome", chromeWebStoreExtensionURL)
+		cmd = exec.Command("open", "-a", macOSBrowserAppName(browserSelector), chromeWebStoreExtensionURL)
 	case "linux":
 		cmd = exec.Command("xdg-open", chromeWebStoreExtensionURL)
 	case "windows":
