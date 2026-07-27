@@ -12,7 +12,7 @@ jobs:
   update-homebrew-tap:
     runs-on: ubuntu-latest
     env:
-      HOMEBREW_TAP_REPOSITORY: iFurySt/homebrew-open-browser-use
+      HOMEBREW_TAP_REPOSITORY: baofu100year/homebrew-open-browser-use
       HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -80,6 +80,7 @@ jobs:
             "${darwin_arm64_sha256}" \
             "${linux_amd64_sha256}" \
             "${linux_arm64_sha256}" \
+            "${GITHUB_REPOSITORY}" \
             > "${tmp_dir}/tap/Formula/open-browser-use.rb"
 
           cd "${tmp_dir}/tap"
