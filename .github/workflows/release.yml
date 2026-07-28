@@ -12,33 +12,6 @@ on:
       title:
         description: 给人看的发布标题
         required: false
-      publish_chrome_web_store:
-        description: 是否把 Chrome extension 上传并提交到 Chrome Web Store 审核
-        required: false
-        type: boolean
-        default: false
-      chrome_publish_type:
-        description: Chrome Web Store publishType
-        required: false
-        type: choice
-        options:
-          - DEFAULT_PUBLISH
-          - STAGED_PUBLISH
-        default: DEFAULT_PUBLISH
-      chrome_deploy_percentage:
-        description: 可选灰度比例，留空则使用开发者后台当前设置
-        required: false
-        default: ""
-      chrome_skip_review:
-        description: 是否请求跳过审核，只有符合条件时 Chrome Web Store 才会接受
-        required: false
-        type: boolean
-        default: false
-      chrome_cancel_pending_submission:
-        description: 是否先取消 Chrome Web Store 中当前审核中或 staged 的提交，再上传本次版本
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -48,8 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      attestations: write
-      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -77,85 +48,17 @@ jobs:
           echo "tag=${release_tag}" >> "${GITHUB_OUTPUT}"
           echo "title=${release_title}" >> "${GITHUB_OUTPUT}"
 
-      - name: 打包 release 制品
-        id: package
+      - name: 构建 CLI 二进制
         env:
-          CHROME_EXTENSION_PRIVATE_KEY: ${{ secrets.CHROME_EXTENSION_PRIVATE_KEY }}
-          OPEN_BROWSER_USE_VERSION: ${{ steps.release.outputs.tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
-          export OPEN_BROWSER_USE_VERSION="${OPEN_BROWSER_USE_VERSION#v}"
-          ./scripts/release-package.sh
-          cli_asset_count="$(find dist/cli -maxdepth 1 -type f -name '*.tar.gz' | wc -l | tr -d ' ')"
-          if [ "${cli_asset_count}" -ne 4 ]; then
-            echo "Expected 4 CLI release archives, found ${cli_asset_count}" >&2
+          version="${RELEASE_TAG#v}"
+          ./scripts/build-cli-release-archives.sh "${version}" dist/cli
+          cli_asset_count="$(find dist/cli -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | wc -l | tr -d ' ')"
+          if [ "${cli_asset_count}" -ne 6 ]; then
+            echo "Expected 6 CLI release archives, found ${cli_asset_count}" >&2
             exit 1
           fi
-          windows_cli_asset_count="$(find dist/cli -maxdepth 1 -type f -name '*.zip' | wc -l | tr -d ' ')"
-          if [ "${windows_cli_asset_count}" -ne 2 ]; then
-            echo "Expected 2 Windows CLI release archives, found ${windows_cli_asset_count}" >&2
-            exit 1
-          fi
-          chrome_extension_zip="$(find dist/chrome-extension -maxdepth 1 -type f -name '*.zip' -print -quit)"
-          if [ -z "${chrome_extension_zip}" ]; then
-            echo "Chrome extension zip not found" >&2
-            exit 1
-          fi
-          chrome_extension_crx="$(find dist/chrome-extension -maxdepth 1 -type f -name '*.crx' -print -quit)"
-          if [ -z "${chrome_extension_crx}" ]; then
-            echo "Chrome extension crx not found" >&2
-            exit 1
-          fi
-          skill_zip="dist/skills/open-browser-use-skill.zip"
-          if [ ! -f "${skill_zip}" ]; then
-            echo "Open Browser Use skill zip not found" >&2
-            exit 1
-          fi
-          skill_bundle="dist/skills/open-browser-use.skill"
-          if [ ! -f "${skill_bundle}" ]; then
-            echo "Open Browser Use .skill bundle not found" >&2
-            exit 1
-          fi
-          echo "chrome_extension_zip=${chrome_extension_zip}" >> "${GITHUB_OUTPUT}"
-          echo "chrome_extension_crx=${chrome_extension_crx}" >> "${GITHUB_OUTPUT}"
-          echo "skill_zip=${skill_zip}" >> "${GITHUB_OUTPUT}"
-          echo "skill_bundle=${skill_bundle}" >> "${GITHUB_OUTPUT}"
-
-      - name: 生成 SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          path: .
-          format: spdx-json
-          output-file: dist/sbom.spdx.json
-          upload-artifact: false
-
-      - name: 上传内部 release 证据
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release-evidence
-          path: |
-            dist/repo-metadata.tgz
-            dist/release-manifest.json
-            dist/cli/*.tar.gz
-            dist/cli/*.zip
-            dist/chrome-extension/*.zip
-            dist/chrome-extension/*.crx
-            dist/chrome-extension/*.json
-            dist/skills/*.zip
-            dist/skills/*.skill
-            dist/skills/*.json
-            dist/sbom.spdx.json
-
-      - name: 生成 build provenance
-        if: ${{ !github.event.repository.private }}
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
-        with:
-          subject-path: |
-            dist/chrome-extension/*.zip
-            dist/chrome-extension/*.crx
-            dist/cli/*.tar.gz
-            dist/cli/*.zip
-            dist/skills/*.zip
-            dist/skills/*.skill
 
       - name: 创建 GitHub Release
         env:
@@ -166,10 +69,6 @@ jobs:
           assets=(
             dist/cli/*.tar.gz
             dist/cli/*.zip
-            dist/chrome-extension/*.zip
-            dist/chrome-extension/*.crx
-            dist/skills/*.zip
-            dist/skills/*.skill
           )
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
@@ -179,59 +78,3 @@ jobs:
               --title "${RELEASE_TITLE}" \
               --generate-notes
           fi
-
-      - name: 上传并提交 Chrome Web Store 审核
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_chrome_web_store) || (github.event_name == 'push' && vars.CWS_AUTO_PUBLISH == 'true') }}
-        env:
-          CWS_ACCESS_TOKEN: ${{ secrets.CWS_ACCESS_TOKEN }}
-          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-          CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
-          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-          CHROME_EXTENSION_ZIP: ${{ steps.package.outputs.chrome_extension_zip }}
-          CHROME_PUBLISH_TYPE_INPUT: ${{ inputs.chrome_publish_type }}
-          CHROME_DEPLOY_PERCENTAGE_INPUT: ${{ inputs.chrome_deploy_percentage }}
-          CHROME_SKIP_REVIEW_INPUT: ${{ inputs.chrome_skip_review }}
-          CHROME_CANCEL_PENDING_SUBMISSION_INPUT: ${{ inputs.chrome_cancel_pending_submission }}
-          CWS_PUBLISH_TYPE: ${{ vars.CWS_PUBLISH_TYPE }}
-          CWS_DEPLOY_PERCENTAGE: ${{ vars.CWS_DEPLOY_PERCENTAGE }}
-          CWS_SKIP_REVIEW: ${{ vars.CWS_SKIP_REVIEW }}
-          CWS_CANCEL_PENDING_SUBMISSION: ${{ vars.CWS_CANCEL_PENDING_SUBMISSION }}
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            publish_type="${CHROME_PUBLISH_TYPE_INPUT:-DEFAULT_PUBLISH}"
-            deploy_percentage="${CHROME_DEPLOY_PERCENTAGE_INPUT:-}"
-            skip_review="${CHROME_SKIP_REVIEW_INPUT:-false}"
-            cancel_pending_submission="${CHROME_CANCEL_PENDING_SUBMISSION_INPUT:-false}"
-          else
-            publish_type="${CWS_PUBLISH_TYPE:-DEFAULT_PUBLISH}"
-            deploy_percentage="${CWS_DEPLOY_PERCENTAGE:-}"
-            skip_review="${CWS_SKIP_REVIEW:-false}"
-            cancel_pending_submission="${CWS_CANCEL_PENDING_SUBMISSION:-false}"
-          fi
-
-          args=(
-            --zip "${CHROME_EXTENSION_ZIP}"
-            --output dist/chrome-extension/chrome-web-store-result.json
-            --publish-type "${publish_type}"
-          )
-          if [ -n "${deploy_percentage}" ]; then
-            args+=(--deploy-percentage "${deploy_percentage}")
-          fi
-          if [ "${skip_review}" = "true" ]; then
-            args+=(--skip-review)
-          fi
-          if [ "${cancel_pending_submission}" = "true" ]; then
-            args+=(--cancel-pending)
-          fi
-          ./scripts/publish-chrome-web-store.mjs --submit "${args[@]}"
-
-      - name: 上传 Chrome Web Store API 结果
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: chrome-web-store-result
-          path: dist/chrome-extension/chrome-web-store-result.json
-          if-no-files-found: ignore
