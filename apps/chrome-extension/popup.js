@@ -1,4 +1,4 @@
-const REPO_URL = "https://github.com/iFurySt/open-browser-use";
+const REPO_URL = "https://github.com/baofu100year/open-browser-use";
 const REFRESH_INTERVAL_MS = 5000;
 
 const statusPill = document.getElementById("status-pill");
@@ -107,12 +107,8 @@ function detectPlatform() {
       label: "macOS",
       commands: [
         {
-          label: "npm",
-          command: "npm install -g open-browser-use && open-browser-use setup"
-        },
-        {
           label: "Homebrew",
-          command: "brew install iFurySt/open-browser-use/open-browser-use && open-browser-use setup"
+          command: "brew install baofu100year/open-browser-use/open-browser-use && open-browser-use setup"
         }
       ]
     };
@@ -123,8 +119,8 @@ function detectPlatform() {
       label: "Windows",
       commands: [
         {
-          label: "npm",
-          command: "npm install -g open-browser-use && open-browser-use setup"
+          label: "Homebrew",
+          command: "brew install baofu100year/open-browser-use/open-browser-use && open-browser-use setup"
         }
       ]
     };
@@ -135,8 +131,8 @@ function detectPlatform() {
       label: "Linux",
       commands: [
         {
-          label: "npm",
-          command: "npm install -g open-browser-use && open-browser-use setup"
+          label: "Homebrew",
+          command: "brew install baofu100year/open-browser-use/open-browser-use && open-browser-use setup"
         }
       ]
     };
@@ -146,8 +142,8 @@ function detectPlatform() {
     label: "This OS",
     commands: [
       {
-        label: "npm",
-        command: "npm install -g open-browser-use && open-browser-use setup"
+        label: "Homebrew",
+        command: "brew install baofu100year/open-browser-use/open-browser-use && open-browser-use setup"
       }
     ]
   };
