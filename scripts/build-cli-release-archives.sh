@@ -8,7 +8,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 version="$1"
-output_dir="$2"
+output_dir="$(cd "$2" 2>/dev/null && pwd || echo "$2")"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 mkdir -p "${output_dir}"
@@ -46,10 +46,7 @@ for target in "${targets[@]}"; do
   )
 
   if [ "${goos}" = "windows" ]; then
-    (
-      cd "${work_dir}"
-      zip -q -X "${output_dir}/${artifact}" "${output_name}"
-    )
+    zip -q -X "${output_dir}/${artifact}" -j "${work_dir}/${output_name}"
   elif [ "${tar_supports_gnu_flags}" = true ]; then
     tar \
       --sort=name \
