@@ -268,11 +268,37 @@ func installNativeManifestForBrowser(extensionID string, binaryPath string, outp
 	if err != nil {
 		return "", err
 	}
+	// Resolve target path first.
 	path := outputPath
 	if path == "" {
 		path, err = defaultNativeHostManifestPathForBrowser(browserSelector)
 		if err != nil {
 			return "", err
+		}
+	}
+	// Merge with existing manifest to keep both old and new extension IDs.
+	if existingData, err := os.ReadFile(path); err == nil {
+		var existingManifest map[string]any
+		if json.Unmarshal(existingData, &existingManifest) == nil {
+			if existingOrigins, ok := existingManifest["allowed_origins"].([]any); ok {
+				newOrigins, _ := manifest["allowed_origins"].([]any)
+				originSet := make(map[string]bool)
+				for _, o := range existingOrigins {
+					if s, ok := o.(string); ok {
+						originSet[s] = true
+					}
+				}
+				for _, o := range newOrigins {
+					if s, ok := o.(string); ok {
+						originSet[s] = true
+					}
+				}
+				merged := make([]any, 0, len(originSet))
+				for origin := range originSet {
+					merged = append(merged, origin)
+				}
+				manifest["allowed_origins"] = merged
+			}
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
