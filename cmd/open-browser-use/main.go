@@ -3178,15 +3178,15 @@ func defaultUnpackedExtensionDir() (string, error) {
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		return filepath.Join(home, "Library/Application Support/OpenBrowserUse/chrome-extension/release"), nil
+		return filepath.Join(home, "Library/Application Support/OpenBrowserUse/extension/release"), nil
 	case "linux":
-		return filepath.Join(home, ".local/share/open-browser-use/chrome-extension/release"), nil
+		return filepath.Join(home, ".local/share/open-browser-use/extension/release"), nil
 	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if strings.TrimSpace(localAppData) == "" {
 			localAppData = filepath.Join(home, "AppData", "Local")
 		}
-		return filepath.Join(localAppData, "OpenBrowserUse", "chrome-extension", "release"), nil
+		return filepath.Join(localAppData, "OpenBrowserUse", "extension", "release"), nil
 	default:
 		return "", fmt.Errorf("release extension setup is not implemented for %s", runtime.GOOS)
 	}
