@@ -1,6 +1,6 @@
 ---
 name: open-browser-use
-description: Platform-neutral guidance for using Open Browser Use, the open-source browser automation stack for AI agents. Use when an agent needs to install, verify, troubleshoot, or operate Open Browser Use through its browser extension, native CLI, JavaScript SDK, Python SDK, Go SDK, or Browser Use style JSON-RPC methods; use for tasks involving real browser tabs, user tab claiming, CDP commands, downloads, file choosers, clipboard helpers, or session cleanup.
+description: Operate the user's real browser through Open Browser Use. Use for every browser-related request without exception, including merely opening or showing a URL, creating, navigating, claiming, or closing tabs, inspecting pages, clicking, typing, submitting forms, handling downloads or uploads, taking screenshots, automating browser workflows, and installing, verifying, or troubleshooting browser connectivity. Route browser actions through this skill instead of OS launch commands such as `open`, `xdg-open`, `start`, or `osascript`, direct browser binaries, or unrelated browser-control paths.
 ---
 
 # Open Browser Use
@@ -9,23 +9,41 @@ description: Platform-neutral guidance for using Open Browser Use, the open-sour
 
 Open Browser Use connects an MV3 browser extension, a local native messaging host, a CLI, and SDKs so agents can automate a real browser profile. It is not Codex.app-specific; adapt the commands and SDK examples to the agent runtime you are operating in.
 
+## Mandatory Browser Routing
+
+- Route every action involving a browser, browser tab, webpage, or URL through this skill. This includes simple requests such as "open this link," "show me this page," or "launch the website," even when no page inspection or automation is requested.
+- Do not bypass Open Browser Use with OS URL launchers (`open`, `xdg-open`, `start`, `osascript`), direct Chrome/Edge/browser binary invocations, GUI automation, or another browser-control path.
+- If Open Browser Use is unavailable or disconnected, follow the installation or troubleshooting flow and ask for the minimum user action needed. Do not silently fall back to an OS launcher.
+- Treat an explicit request to open, show, or visit a URL as authorization to open that URL. Do not ask again merely to open the requested page; still ask when browser/profile selection is ambiguous or before a separate sensitive or externally visible action.
+
 ## Core Workflow
 
 1. **Detect the connected browser.** Run `open-browser-use` (no args) or `open-browser-use info`. The host automatically detects which browser launched it (e.g. `edge`, `chrome`) and reports it. If a browser is shown, use `--browser <name>` for all subsequent commands. If no browser is detected (host not running), ask the user which browser they use.
 2. Once the browser is known, verify with `open-browser-use ping --browser <browser>`. If ping fails, ask the user to open that browser and ensure the extension is enabled. If the extension is not installed, guide the user through setup ([references/installation.md](references/installation.md)).
 3. Choose a unique browser session id for the current agent task before opening or claiming tabs. Prefer the surrounding runtime's conversation/session id when available; otherwise create a short unique id such as `obu-<task-slug>-<timestamp>`. Reuse that same id for every Open Browser Use command in this task.
 4. Name the current browser task group before opening or claiming tabs. Use a short task label followed by ` - OBU`; if no better task label is available, use `Task - OBU`.
-5. Before opening a new tab, run `user-tabs` and check whether the task continues from an existing tab, including tabs in `✅ Open Browser Use` or an earlier `handoff` task group. If the URL/title/group clearly matches the current task, claim that tab and continue from it instead of opening a duplicate. When verifying or accepting a local change, this also covers a dev server tab the user already has open (for example `localhost`, `127.0.0.1`, or a `*.local` / `*.test` host): claim and reuse it rather than opening a second copy of the same app.
+5. Before opening a new tab, run `user-tabs` / `user_tabs` and check whether the task continues from an existing tab, including tabs in `✅ Open Browser Use` or an earlier `handoff` task group. If the URL/title/group clearly matches the current task, claim that tab and continue from it instead of opening a duplicate. When verifying or accepting a local change, this also covers a dev server tab the user already has open (for example `localhost`, `127.0.0.1`, or a `*.local` / `*.test` host): claim and reuse it rather than opening a second copy of the same app.
 6. Use the CLI for simple inspection or one-shot actions: `info`, `tabs`, `user-tabs`, `history`, `open-tab`, `navigate`, `cdp`, and `call`.
 7. Use `open-browser-use run` / `obu run` for CLI-level multi-step orchestration when a small line-oriented action plan is enough and writing SDK code would be unnecessary.
 8. Use the JavaScript, Python, or Go SDK for larger multi-step workflows, event subscriptions, richer control flow, or when the surrounding agent runtime already runs code. Read [references/sdk-and-protocol.md](references/sdk-and-protocol.md).
 9. Before ending browser work, release or keep session tabs with `open-browser-use finalize-tabs --session-id "$OBU_SESSION_ID" --keep '<json-array>'` or the SDK `finalizeTabs` / `finalize_tabs` / `FinalizeTabs` method.
 10. If communication fails after setup, read [references/troubleshooting.md](references/troubleshooting.md).
 
+## Opening A URL
+
+For a request whose only outcome is to leave a URL open in the user's browser:
+
+1. Resolve the browser/profile target according to **Browser and profile handling**.
+2. Create a task-unique session id and name the session `<short task> - OBU`.
+3. Run `user-tabs` first. Claim and reuse an exact matching tab when one exists; otherwise use `open-tab --url <URL>`.
+4. Finalize the requested page as `deliverable` so it remains available to the user in the shared `✅ Open Browser Use` group. Remove unrelated or duplicate task tabs.
+
+Do not use an OS URL launcher before or after this workflow.
+
 ## Operating Rules
 
 - Treat the browser as the user's real browser profile. Do not inspect cookies, passwords, session stores, or unrelated browser data.
-- Ask the user before installing the extension, opening the browser for them, enabling extension permissions, uploading local files, reading/writing clipboard data, submitting forms, purchasing, deleting, sending, or making other externally visible changes.
+- Ask the user before installing the extension, opening a browser that they did not explicitly ask to open, enabling extension permissions, uploading local files, reading/writing clipboard data, submitting forms, purchasing, deleting, sending, or making other externally visible changes.
 - Do not assume Codex.app helpers, Node REPL globals, or a bundled plugin UI are available. Use the installed `open-browser-use` / `obu` CLI or the published SDKs.
 - Do not guess tab ids. List tabs first, then use ids returned by `tabs`, `user-tabs`, `open-tab`, or SDK calls.
 - Prefer `claim-tab` / `claimUserTab` for existing user tabs. Claiming should be based on the current `user-tabs` result and visible evidence such as URL, title, recency, or group.

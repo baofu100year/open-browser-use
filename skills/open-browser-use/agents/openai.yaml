@@ -1,4 +1,4 @@
 interface:
   display_name: "Open Browser Use(OBU)"
-  short_description: "Guide agents using Open Browser Use"
-  default_prompt: "Use $open-browser-use to automate Chrome through Open Browser Use."
+  short_description: "Route every browser action through Open Browser Use"
+  default_prompt: "Use $open-browser-use to open this URL in my browser and keep the page available."
