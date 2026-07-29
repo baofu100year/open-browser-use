@@ -28,6 +28,7 @@ import (
 )
 
 var version = "dev"
+var githubRepo = "iFurySt/open-browser-use"
 const defaultChromeExtensionID = "bgjoihaepiejlfjinojjfgokghnodnhd"
 const defaultCLISessionID = "obu-cli"
 const defaultMCPSessionID = "obu-mcp"
@@ -2989,7 +2990,8 @@ func windowsRegistryBrowserVendorProduct(browserSelector string) (string, error)
 func downloadLatestReleaseZIP() (string, error) {
 	assetName := fmt.Sprintf("open-browser-use-chrome-extension-%s.zip", version)
 	url := fmt.Sprintf(
-		"https://github.com/iFurySt/open-browser-use/releases/download/v%s/%s",
+		"https://github.com/%s/releases/download/v%s/%s",
+		githubRepo,
 		version,
 		assetName,
 	)

@@ -42,7 +42,7 @@ for target in "${targets[@]}"; do
   (
     cd "${repo_root}"
     CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
-      go build -trimpath -ldflags="-s -w -X main.version=${version}" -o "${work_dir}/${output_name}" ./cmd/open-browser-use
+      go build -trimpath -ldflags="-s -w -X main.version=${version} -X main.githubRepo=${GITHUB_REPOSITORY:-iFurySt/open-browser-use}" -o "${work_dir}/${output_name}" ./cmd/open-browser-use
   )
 
   if [ "${goos}" = "windows" ]; then
