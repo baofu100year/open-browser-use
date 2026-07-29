@@ -970,11 +970,11 @@ func (status browserExtensionStatus) summary() string {
 	if status.Installed {
 		if status.Version != "" {
 			if compareChromeVersions(status.Version, status.ExpectedVersion) >= 0 {
-				return fmt.Sprintf("Installed v%s and version matches CLI v%s. Open Chrome and run `open-browser-use info` to verify the connection.", status.Version, status.ExpectedVersion)
+				return fmt.Sprintf("Installed v%s and version matches CLI v%s. Open your browser and run `open-browser-use info` to verify the connection.", status.Version, status.ExpectedVersion)
 			}
-			return fmt.Sprintf("Installed v%s, but not connected yet. Open Chrome and run `open-browser-use info`.", status.Version)
+			return fmt.Sprintf("Installed v%s, but not connected yet. Open your browser and run `open-browser-use info`.", status.Version)
 		}
-		return "Installed, but not connected yet. Open Chrome and run `open-browser-use info`."
+		return "Installed, but not connected yet. Open your browser and run `open-browser-use info`."
 	}
 	return fmt.Sprintf("Not installed yet. Run `%s`.", status.InstallCommand)
 }
@@ -1044,6 +1044,13 @@ func runSilentCommand(timeout time.Duration, name string, args ...string) error 
 }
 
 func compareChromeVersions(left string, right string) int {
+	// "dev" is always considered newer than any real version.
+	if left == "dev" && right != "dev" {
+		return 1
+	}
+	if right == "dev" && left != "dev" {
+		return -1
+	}
 	leftParts := strings.Split(left, ".")
 	rightParts := strings.Split(right, ".")
 	maxParts := len(leftParts)
