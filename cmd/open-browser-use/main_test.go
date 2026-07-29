@@ -411,7 +411,7 @@ func TestCobraSetupBrowserEdgeWritesManifest(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Extension installed") {
+	if !strings.Contains(output.String(), "Extension ready") {
 		t.Fatalf("expected setup output, got %q", output.String())
 	}
 	// Verify native manifest was written to Edge's directory.
@@ -465,7 +465,7 @@ func TestCobraSetupWritesNativeAndExternalManifests(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Extension installed") {
+	if !strings.Contains(output.String(), "Extension ready") {
 		t.Fatalf("expected setup output, got %q", output.String())
 	}
 	if !strings.Contains(output.String(), "Native host:") {
@@ -535,7 +535,7 @@ func TestCobraSetupBetaUsesProvidedZIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := output.String()
-	if !strings.Contains(got, "Extension installed") {
+	if !strings.Contains(got, "Extension ready") {
 		t.Fatalf("expected setup output to mention extension ready, got %q", got)
 	}
 	if !strings.Contains(got, "Extension:") {
