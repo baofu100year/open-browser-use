@@ -11,7 +11,7 @@ Open Browser Use connects an MV3 browser extension, a local native messaging hos
 
 ## Core Workflow
 
-1. **Detect the connected browser first.** Run `open-browser-use profiles --connected` before any other browser command. This tells you which browser(s) and profile(s) have the extension installed and are currently reachable. See "Browser and profile handling" below for the full detection and selection rules.
+1. **Detect connected browser profiles first.** Run `open-browser-use profiles --connected` before any other browser command. This lists which browser/profile combinations have the extension installed and are currently reachable. See "Browser and profile handling" below for the full detection and selection rules.
 2. Verify the connection with `open-browser-use ping` or `obu ping`, passing `--browser` and `--profile` once a target is chosen. If ping fails or no profiles are connected, read [references/installation.md](references/installation.md).
 3. Choose a unique browser session id for the current agent task before opening or claiming tabs. Prefer the surrounding runtime's conversation/session id when available; otherwise create a short unique id such as `obu-<task-slug>-<timestamp>`. Reuse that same id for every Open Browser Use command in this task.
 4. Name the current browser task group before opening or claiming tabs. Use a short task label followed by ` - OBU`; if no better task label is available, use `Task - OBU`.
