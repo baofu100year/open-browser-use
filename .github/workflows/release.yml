@@ -60,6 +60,14 @@ jobs:
             exit 1
           fi
 
+      - name: 打包浏览器扩展
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          mkdir -p dist/extension
+          (cd apps/chrome-extension && zip -r "${GITHUB_WORKSPACE}/dist/extension/open-browser-use-chrome-extension-${version}.zip" .)
+
       - name: 创建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,6 +77,7 @@ jobs:
           assets=(
             dist/cli/*.tar.gz
             dist/cli/*.zip
+            dist/extension/*.zip
           )
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
