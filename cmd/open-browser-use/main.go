@@ -141,6 +141,7 @@ func newSetupCommand() *cobra.Command {
 	var binaryPath string
 	var zipPath string
 	var browser string
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Download, unpack, and install the browser extension",
@@ -151,7 +152,7 @@ Requires developer mode to be enabled in the browser's extensions page.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Developer mode is required for loading unpacked extensions.
-			if !isDeveloperModeEnabled(browser) {
+			if !force && !isDeveloperModeEnabled(browser) {
 				return fmt.Errorf("developer mode is not enabled for %s.\nPlease enable it at chrome://extensions (or edge://extensions) and retry.", browserDisplayName(browser))
 			}
 			resolvedZIPPath := zipPath
@@ -185,10 +186,10 @@ Requires developer mode to be enabled in the browser's extensions page.`,
 			}
 			// Open the extensions page and reveal the unpacked folder for loading.
 			if err := openChromeExtensionsPage(browser); err != nil {
-				return err
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Could not open extensions page: %v\n", err)
 			}
 			if err := revealFile(unpackedPath); err != nil {
-				return err
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Could not reveal folder: %v\n", err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "✅ Extension ready.\n")
 			fmt.Fprintf(cmd.OutOrStdout(), "   1. Native host registered: %s\n", manifestPath)
@@ -202,6 +203,7 @@ Requires developer mode to be enabled in the browser's extensions page.`,
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&zipPath, "zip", "", "existing extension zip path; defaults to the latest GitHub Release zip")
 	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
+	cmd.Flags().BoolVar(&force, "force", false, "skip developer mode check")
 	return cmd
 }
 

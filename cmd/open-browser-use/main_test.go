@@ -388,9 +388,9 @@ func TestListInstalledChromeProfilesIncludesEdge(t *testing.T) {
 	}
 }
 
-func TestCobraSetupBrowserEdgeMentionsBestEffort(t *testing.T) {
+func TestCobraSetupBrowserEdgeWritesManifest(t *testing.T) {
 	if runtime.GOOS != "darwin" {
-		t.Skip("stable native host link is not implemented on windows and Edge root test uses macOS browser roots")
+		t.Skip("Edge root test uses macOS browser roots")
 	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -399,20 +399,24 @@ func TestCobraSetupBrowserEdgeMentionsBestEffort(t *testing.T) {
 	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	externalPath := filepath.Join(t.TempDir(), defaultChromeExtensionID+".json")
+	zipPath := filepath.Join(t.TempDir(), "open-browser-use-chrome-extension.zip")
+	if err := writeTestExtensionZIP(zipPath); err != nil {
+		t.Fatal(err)
+	}
 
 	cmd := newRootCommand()
 	var output bytes.Buffer
 	cmd.SetOut(&output)
-	cmd.SetArgs([]string{"setup", "--browser", "edge", "--path", targetPath, "--external-extension-output", externalPath, "--no-open"})
+	cmd.SetArgs([]string{"setup", "--browser", "edge", "--path", targetPath, "--zip", zipPath, "--force"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "best-effort") {
-		t.Fatalf("expected setup output to mention best-effort Edge caveat, got %q", output.String())
+	if !strings.Contains(output.String(), "Extension ready") {
+		t.Fatalf("expected setup output, got %q", output.String())
 	}
-	if !strings.Contains(output.String(), "setup beta --browser edge") {
-		t.Fatalf("expected setup output to point to setup beta for Edge, got %q", output.String())
+	// Verify native manifest was written to Edge's directory.
+	if _, err := os.Stat(filepath.Join(home, "Library/Application Support/Microsoft Edge/NativeMessagingHosts", host.NativeHostName+".json")); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -449,59 +453,57 @@ func TestCobraSetupWritesNativeAndExternalManifests(t *testing.T) {
 	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	externalPath := filepath.Join(t.TempDir(), defaultChromeExtensionID+".json")
+	zipPath := filepath.Join(t.TempDir(), "open-browser-use-chrome-extension.zip")
+	if err := writeTestExtensionZIP(zipPath); err != nil {
+		t.Fatal(err)
+	}
 
 	cmd := newRootCommand()
 	var output bytes.Buffer
 	cmd.SetOut(&output)
-	cmd.SetArgs([]string{"setup", "--path", targetPath, "--external-extension-output", externalPath, "--no-open"})
+	cmd.SetArgs([]string{"setup", "--path", targetPath, "--zip", zipPath, "--force"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "✅ Open Browser Use setup") {
-		t.Fatalf("expected setup output to mention native manifest, got %q", output.String())
+	if !strings.Contains(output.String(), "Extension ready") {
+		t.Fatalf("expected setup output, got %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Registered native host") {
+	if !strings.Contains(output.String(), "Native host registered") {
 		t.Fatalf("expected setup output to mention native host registration, got %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Browser extension") {
-		t.Fatalf("expected setup output to mention browser extension status, got %q", output.String())
-	}
-	if !strings.Contains(output.String(), chromeWebStoreExtensionURL) {
-		t.Fatalf("expected setup output to mention Chrome Web Store URL, got %q", output.String())
+	if !strings.Contains(output.String(), "Extension unpacked") {
+		t.Fatalf("expected setup output to mention unpacked extension, got %q", output.String())
 	}
 	if _, err := os.Stat(filepath.Join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts", host.NativeHostName+".json")); runtime.GOOS == "darwin" && err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(externalPath); err != nil {
-		t.Fatal(err)
-	}
 }
 
-func TestCobraSetupRejectsBitBrowserExternalExtensionPath(t *testing.T) {
+func TestCobraSetupBitBrowserWritesManifest(t *testing.T) {
 	if runtime.GOOS != "darwin" {
-		t.Skip("BitBrowser setup guidance test uses macOS browser roots")
+		t.Skip("BitBrowser setup test uses macOS browser roots")
 	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	writeLocalStateAtRoot(t, bitBrowserRootForTest(home, "abc123"), `{"profile":{"info_cache":{"Default":{"name":"Bit"}}}}`)
+	root := bitBrowserRootForTest(home, "abc123")
+	writeLocalStateAtRoot(t, root, `{"profile":{"info_cache":{"Default":{"name":"Bit"}}}}`)
 	targetPath := filepath.Join(t.TempDir(), "open-browser-use")
 	if err := os.WriteFile(targetPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	zipPath := filepath.Join(t.TempDir(), "test-extension.zip")
+	if err := writeTestExtensionZIP(zipPath); err != nil {
+		t.Fatal(err)
+	}
 
 	cmd := newRootCommand()
-	cmd.SetArgs([]string{"setup", "--browser", "abc123", "--path", targetPath, "--no-open"})
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected BitBrowser setup to require install-manifest path")
+	cmd.SetArgs([]string{"setup", "--browser", "abc123", "--path", targetPath, "--zip", zipPath, "--force"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "install-manifest --browser abc123") {
-		t.Fatalf("expected BitBrowser install-manifest guidance, got %v", err)
-	}
-	manifestPath := filepath.Join(bitBrowserRootForTest(home, "abc123"), "NativeMessagingHosts", host.NativeHostName+".json")
-	if _, statErr := os.Stat(manifestPath); !os.IsNotExist(statErr) {
-		t.Fatalf("expected setup rejection to avoid partial native manifest write, stat err=%v", statErr)
+	manifestPath := filepath.Join(root, "NativeMessagingHosts", host.NativeHostName+".json")
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Fatalf("expected native manifest in BitBrowser root, got error: %v", err)
 	}
 }
 
@@ -528,22 +530,16 @@ func TestCobraSetupBetaUsesProvidedZIP(t *testing.T) {
 	cmd := newRootCommand()
 	var output bytes.Buffer
 	cmd.SetOut(&output)
-	cmd.SetArgs([]string{"setup", "beta", "--path", targetPath, "--zip", zipPath, "--no-open"})
+	cmd.SetArgs([]string{"setup", "--path", targetPath, "--zip", zipPath, "--force"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
 	got := output.String()
-	if !strings.Contains(got, "ZIP:") || !strings.Contains(got, zipPath) {
-		t.Fatalf("expected setup beta output to mention install ZIP path, got %q", got)
-	}
-	if strings.Contains(got, "-manual.zip") {
-		t.Fatalf("expected setup beta output to avoid a separate manual ZIP path, got %q", got)
+	if !strings.Contains(got, "Extension ready") {
+		t.Fatalf("expected setup output to mention extension ready, got %q", got)
 	}
 	if !strings.Contains(got, "Extension id: "+expectedExtensionID) {
-		t.Fatalf("expected setup beta output to mention unpacked extension id, got %q", got)
-	}
-	if !strings.Contains(got, "drag in "+zipPath) && !strings.Contains(got, "All set.") {
-		t.Fatalf("expected setup beta output to mention manual install or connected status, got %q", got)
+		t.Fatalf("expected setup output to mention extension id, got %q", got)
 	}
 	manifestPath := filepath.Join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts", host.NativeHostName+".json")
 	if runtime.GOOS == "linux" {
@@ -566,13 +562,6 @@ func TestCobraSetupBetaUsesProvidedZIP(t *testing.T) {
 	}
 	if !strings.Contains(string(unpackedManifest), betaExtensionPublicKey) {
 		t.Fatalf("expected unpacked manifest to include stable key, got %s", unpackedManifest)
-	}
-	installManifest, err := readManifestFromZIP(zipPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(installManifest), betaExtensionPublicKey) {
-		t.Fatalf("expected install ZIP manifest to include stable key, got %s", installManifest)
 	}
 }
 
