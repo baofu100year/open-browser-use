@@ -373,6 +373,7 @@ type browserExtensionStatus struct {
 	Version         string
 	VersionSource   string
 	ExpectedVersion string
+	BrowserName     string
 	InstallCommand  string
 	UpgradeCommand  string
 	Error           string
@@ -425,24 +426,27 @@ func renderStartupStatus(writer io.Writer) error {
 	status := detectBrowserExtension(host.DefaultSocketDir, 700*time.Millisecond)
 	fmt.Fprintln(writer, "Open Browser Use")
 	fmt.Fprintf(writer, "📦 CLI version: %s\n", version)
+	if status.BrowserName != "" {
+		fmt.Fprintf(writer, "🌐 Connected browser: %s\n", status.BrowserName)
+	}
 	fmt.Fprintf(writer, "🧩 Browser extension: %s\n", status.summary())
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "Next steps:")
 	if status.needsInstall() {
 		fmt.Fprintf(writer, "  1. Install the browser extension: %s\n", status.InstallCommand)
 		fmt.Fprintln(writer, "     If the Chrome Web Store item is unavailable, use: open-browser-use setup beta")
-		fmt.Fprintln(writer, "  2. Restart Chrome if it asks you to enable the extension.")
+		fmt.Fprintln(writer, "  2. Restart your browser if it asks you to enable the extension.")
 		fmt.Fprintln(writer, "  3. Verify the connection: open-browser-use info")
 		return nil
 	}
 	if status.needsUpgrade() {
 		fmt.Fprintf(writer, "  1. Upgrade the browser extension: %s\n", status.UpgradeCommand)
-		fmt.Fprintln(writer, "  2. Restart Chrome if it asks you to reload the extension.")
+		fmt.Fprintln(writer, "  2. Restart your browser if it asks you to reload the extension.")
 		fmt.Fprintln(writer, "  3. Verify the connection: open-browser-use info")
 		return nil
 	}
 	if !status.Reachable {
-		fmt.Fprintln(writer, "  1. Open Chrome and make sure the Open Browser Use extension is enabled.")
+		fmt.Fprintln(writer, "  1. Open your browser and make sure the Open Browser Use extension is enabled.")
 		fmt.Fprintln(writer, "  2. Verify the connection: open-browser-use info")
 		return nil
 	}
@@ -535,6 +539,10 @@ func detectBrowserExtensionForBrowser(socketDir string, timeout time.Duration, b
 	if strings.TrimSpace(browserSelector) != "" {
 		status.InstallCommand = "open-browser-use setup --browser " + browserSelector
 		status.UpgradeCommand = status.InstallCommand
+	}
+	// Read browser name from the active host's socket record (detected at launch time).
+	if record, err := host.ReadActiveSocketRecord(socketDir); err == nil && record.BrowserName != "" {
+		status.BrowserName = record.BrowserName
 	}
 	if response, err := invokeWithProfile("", socketDir, browserSelector, "", "getInfo", map[string]any{}, timeout); err == nil {
 		if result, ok := response["result"].(map[string]any); ok {

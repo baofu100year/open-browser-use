@@ -1356,7 +1356,7 @@ func TestCobraUnknownCommand(t *testing.T) {
 func TestInvokeRemovesStaleActiveSocketRecord(t *testing.T) {
 	socketDir := t.TempDir()
 	socketPath := filepath.Join(socketDir, "missing.sock")
-	if err := host.WriteActiveSocketRecord(socketDir, socketPath); err != nil {
+	if err := host.WriteActiveSocketRecord(socketDir, socketPath, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1463,7 +1463,7 @@ func TestInvokeCleansStaleSocketFilesDuringScan(t *testing.T) {
 	if err := staleListener.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := host.WriteActiveSocketRecord(socketDir, stalePath); err != nil {
+	if err := host.WriteActiveSocketRecord(socketDir, stalePath, ""); err != nil {
 		t.Fatal(err)
 	}
 

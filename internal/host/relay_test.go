@@ -143,7 +143,7 @@ func TestActiveSocketRecordLifecycle(t *testing.T) {
 	socketDir := t.TempDir()
 	socketPath := filepath.Join(socketDir, "obu.sock")
 
-	if err := WriteActiveSocketRecord(socketDir, socketPath); err != nil {
+	if err := WriteActiveSocketRecord(socketDir, socketPath, ""); err != nil {
 		t.Fatal(err)
 	}
 	record, err := ReadActiveSocketRecord(socketDir)

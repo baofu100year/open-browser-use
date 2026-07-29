@@ -10,9 +10,11 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -59,9 +61,10 @@ type pendingRequest struct {
 }
 
 type ActiveSocketRecord struct {
-	SocketPath string    `json:"socketPath"`
-	PID        int       `json:"pid"`
-	StartedAt  time.Time `json:"startedAt"`
+	SocketPath  string    `json:"socketPath"`
+	PID         int       `json:"pid"`
+	BrowserName string    `json:"browserName,omitempty"`
+	StartedAt   time.Time `json:"startedAt"`
 }
 
 func NewRelay(config Config, stdin io.Reader, stdout io.Writer) *Relay {
@@ -101,7 +104,7 @@ func (r *Relay) Serve(ctx context.Context) error {
 		_ = listener.Close()
 		return err
 	}
-	if err := WriteActiveSocketRecord(r.config.SocketDir, socketPath); err != nil {
+	if err := WriteActiveSocketRecord(r.config.SocketDir, socketPath, detectBrowserName()); err != nil {
 		_ = listener.Close()
 		return err
 	}
@@ -315,15 +318,16 @@ func ActiveSocketRecordPath(configuredDir string) string {
 	return filepath.Join(socketDir(configuredDir), "active.json")
 }
 
-func WriteActiveSocketRecord(configuredDir string, socketPath string) error {
+func WriteActiveSocketRecord(configuredDir string, socketPath string, browserName string) error {
 	dir := socketDir(configuredDir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	record := ActiveSocketRecord{
-		SocketPath: socketPath,
-		PID:        os.Getpid(),
-		StartedAt:  time.Now().UTC(),
+		SocketPath:  socketPath,
+		PID:         os.Getpid(),
+		BrowserName: browserName,
+		StartedAt:   time.Now().UTC(),
 	}
 	payload, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
@@ -380,4 +384,62 @@ func randomID() string {
 		bytes[8:10],
 		bytes[10:16],
 	)
+}
+
+// detectBrowserName identifies which browser launched this host process
+// by inspecting the parent process name.
+func detectBrowserName() string {
+	ppid := os.Getppid()
+	if ppid <= 1 {
+		return ""
+	}
+	procName, err := parentProcessName(ppid)
+	if err != nil || procName == "" {
+		return ""
+	}
+	name := strings.ToLower(procName)
+	switch {
+	case strings.Contains(name, "microsoft edge"):
+		return "edge"
+	case strings.Contains(name, "google chrome beta"):
+		return "chrome-beta"
+	case strings.Contains(name, "google chrome"):
+		return "chrome"
+	case strings.Contains(name, "chromium"):
+		return "chromium"
+	case strings.Contains(name, "brave"):
+		return "brave"
+	default:
+		return ""
+	}
+}
+
+// parentProcessName returns the process name for a given PID.
+func parentProcessName(pid int) (string, error) {
+	switch runtime.GOOS {
+	case "linux":
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(data)), nil
+	case "darwin":
+		out, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "comm=").Output()
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(out)), nil
+	case "windows":
+		out, err := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/FO", "CSV", "/NH").Output()
+		if err != nil {
+			return "", err
+		}
+		parts := strings.SplitN(string(out), ",", 2)
+		if len(parts) > 0 {
+			return strings.Trim(parts[0], `"`), nil
+		}
+		return "", fmt.Errorf("unexpected tasklist output: %s", string(out))
+	default:
+		return "", fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
 }
