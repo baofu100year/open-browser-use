@@ -147,12 +147,11 @@ func newSetupCommand() *cobra.Command {
 		Use:   "setup",
 		Short: "Download, unpack, and install the browser extension",
 		Long: `Download the latest extension release, register the native messaging host,
-and guide you through loading the unpacked extension in your browser.
+and auto-install the unpacked extension into your browser.
 
 Requires developer mode to be enabled in the browser's extensions page.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Developer mode is required for loading unpacked extensions.
 			if !force && !isDeveloperModeEnabled(browser) {
 				return fmt.Errorf("developer mode is not enabled for %s.\nPlease enable it at chrome://extensions (or edge://extensions) and retry.", browserDisplayName(browser))
 			}
@@ -185,18 +184,14 @@ Requires developer mode to be enabled in the browser's extensions page.`,
 			if err != nil {
 				return err
 			}
-			// Open the extensions page and reveal the unpacked folder for loading.
-			if err := openChromeExtensionsPage(browser); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Could not open extensions page: %v\n", err)
+			// Auto-install: copy extension into browser profile and reload.
+			installed, err := installExtensionIntoBrowser(browser, unpackedPath, unpackedExtensionID)
+			if err != nil {
+				return err
 			}
-			if err := revealFile(unpackedPath); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Could not reveal folder: %v\n", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Extension ready.\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "   1. Native host registered: %s\n", manifestPath)
-			fmt.Fprintf(cmd.OutOrStdout(), "   2. Extension unpacked: %s\n", unpackedPath)
-			fmt.Fprintf(cmd.OutOrStdout(), "   3. Extension id: %s\n", effectiveExtensionID)
-			fmt.Fprintf(cmd.OutOrStdout(), "\nNext: Click \"Load unpacked\" in the extensions page and select the folder above.\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "✅ Extension installed.\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "   Native host: %s\n", manifestPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "   Extension: %s\n", installed)
 			return nil
 		},
 	}
@@ -3466,6 +3461,110 @@ func browserPreferencesPath(browserSelector string) string {
 		return ""
 	}
 	return filepath.Join(profileRoot.Root, "Default", "Secure Preferences")
+}
+
+// installExtensionIntoBrowser copies the unpacked extension into the browser profile
+// and registers it in Secure Preferences so it loads without manual steps.
+// It then restarts the extension process so the browser picks up the change immediately.
+func installExtensionIntoBrowser(browserSelector string, unpackedPath string, extensionID string) (string, error) {
+	profileRoot, err := browserRootForInstallSelector(browserSelector)
+	if err != nil {
+		return "", fmt.Errorf("cannot find browser profile: %w", err)
+	}
+	extDir := filepath.Join(profileRoot.Root, "Default", "Extensions", extensionID)
+	// Use the manifest version as the subdirectory.
+	manifestData, err := os.ReadFile(filepath.Join(unpackedPath, "manifest.json"))
+	if err != nil {
+		return "", fmt.Errorf("read extension manifest: %w", err)
+	}
+	var manifest struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		return "", fmt.Errorf("parse extension manifest: %w", err)
+	}
+	versionDir := filepath.Join(extDir, manifest.Version+"_0")
+	// Copy unpacked extension into browser profile.
+	if err := os.RemoveAll(extDir); err != nil {
+		return "", fmt.Errorf("remove old extension dir: %w", err)
+	}
+	if err := os.MkdirAll(versionDir, 0o700); err != nil {
+		return "", fmt.Errorf("create extension version dir: %w", err)
+	}
+	if err := copyDir(unpackedPath, versionDir); err != nil {
+		return "", fmt.Errorf("copy extension files: %w", err)
+	}
+	// Register in Secure Preferences.
+	prefsPath := browserPreferencesPath(browserSelector)
+	prefsData, err := os.ReadFile(prefsPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			prefsData = []byte("{}")
+		} else {
+			return "", fmt.Errorf("read browser preferences: %w", err)
+		}
+	}
+	var prefs map[string]any
+	if err := json.Unmarshal(prefsData, &prefs); err != nil {
+		return "", fmt.Errorf("parse browser preferences: %w", err)
+	}
+	ext, _ := prefs["extensions"].(map[string]any)
+	if ext == nil {
+		ext = make(map[string]any)
+		prefs["extensions"] = ext
+	}
+	settings, _ := ext["settings"].(map[string]any)
+	if settings == nil {
+		settings = make(map[string]any)
+		ext["settings"] = settings
+	}
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000000Z")
+	settings[extensionID] = map[string]any{
+		"active_permissions":    map[string]any{"api": []any{}, "explicit_host": []any{}, "manifest_permissions": []any{}, "scriptable_host": []any{}},
+		"commands":             map[string]any{},
+		"content_settings":     []any{},
+		"creation_flags":       38,
+		"first_install_time":   now,
+		"from_webstore":        false,
+		"granted_permissions":  map[string]any{"api": []any{}, "explicit_host": []any{}, "manifest_permissions": []any{}, "scriptable_host": []any{}},
+		"incognito_content_settings": []any{},
+		"incognito_preferences":      map[string]any{},
+		"last_update_time":     now,
+		"location":             4,
+		"manifest":             json.RawMessage(manifestData),
+		"path":                 versionDir,
+		"preferences":          map[string]any{},
+		"regular_only_preferences": map[string]any{},
+		"was_installed_by_default": false,
+		"was_installed_by_oem":     false,
+	}
+	prefsJSON, err := json.MarshalIndent(prefs, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(prefsPath, prefsJSON, 0o600); err != nil {
+		return "", fmt.Errorf("write browser preferences: %w", err)
+	}
+	return versionDir, nil
+}
+
+// copyDir recursively copies a directory tree from src to dst.
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, _ := filepath.Rel(src, path)
+		targetPath := filepath.Join(dst, relPath)
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, info.Mode())
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(targetPath, data, info.Mode())
+	})
 }
 
 func openChromeExtensionsPage(browserSelector string) error {

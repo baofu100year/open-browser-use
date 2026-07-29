@@ -411,7 +411,7 @@ func TestCobraSetupBrowserEdgeWritesManifest(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Extension ready") {
+	if !strings.Contains(output.String(), "Extension installed") {
 		t.Fatalf("expected setup output, got %q", output.String())
 	}
 	// Verify native manifest was written to Edge's directory.
@@ -465,14 +465,14 @@ func TestCobraSetupWritesNativeAndExternalManifests(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "Extension ready") {
+	if !strings.Contains(output.String(), "Extension installed") {
 		t.Fatalf("expected setup output, got %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Native host registered") {
-		t.Fatalf("expected setup output to mention native host registration, got %q", output.String())
+	if !strings.Contains(output.String(), "Native host:") {
+		t.Fatalf("expected setup output to mention native host, got %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Extension unpacked") {
-		t.Fatalf("expected setup output to mention unpacked extension, got %q", output.String())
+	if !strings.Contains(output.String(), "Extension:") {
+		t.Fatalf("expected setup output to mention extension path, got %q", output.String())
 	}
 	if _, err := os.Stat(filepath.Join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts", host.NativeHostName+".json")); runtime.GOOS == "darwin" && err != nil {
 		t.Fatal(err)
@@ -535,11 +535,11 @@ func TestCobraSetupBetaUsesProvidedZIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := output.String()
-	if !strings.Contains(got, "Extension ready") {
+	if !strings.Contains(got, "Extension installed") {
 		t.Fatalf("expected setup output to mention extension ready, got %q", got)
 	}
-	if !strings.Contains(got, "Extension id: "+expectedExtensionID) {
-		t.Fatalf("expected setup output to mention extension id, got %q", got)
+	if !strings.Contains(got, "Extension:") {
+		t.Fatalf("expected setup output to mention extension path, got %q", got)
 	}
 	manifestPath := filepath.Join(home, "Library/Application Support/Google/Chrome/NativeMessagingHosts", host.NativeHostName+".json")
 	if runtime.GOOS == "linux" {
