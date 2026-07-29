@@ -215,13 +215,13 @@ func mcpTools() []mcpTool {
 		{
 			Name:        "user_tabs",
 			Title:       "List User Tabs",
-			Description: "List visible Chrome tabs from the user's current browser profile.",
+			Description: "List visible browser tabs from the user's current browser profile.",
 			InputSchema: emptyObjectSchema(),
 		},
 		{
 			Name:        "history",
-			Title:       "Search Chrome History",
-			Description: "Search the user's Chrome history.",
+			Title:       "Search Browser History",
+			Description: "Search the user's browser history.",
 			InputSchema: objectSchema(map[string]any{
 				"query": stringSchema("Search query. Leave empty to list recent history."),
 				"limit": map[string]any{
@@ -245,9 +245,9 @@ func mcpTools() []mcpTool {
 		{
 			Name:        "claim_tab",
 			Title:       "Claim Existing Tab",
-			Description: "Claim an existing Chrome tab by id for the current browser session.",
+			Description: "Claim an existing browser tab by id for the current browser session.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Chrome tab id to claim."),
+				"tab_id": integerSchema("Browser tab id to claim."),
 			}, []string{"tab_id"}),
 		},
 		{
@@ -255,7 +255,7 @@ func mcpTools() []mcpTool {
 			Title:       "Navigate Tab",
 			Description: "Navigate a managed tab. If tab_id is omitted, uses the current tab from a prior open_tab or claim_tab call.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
 				"url":    stringSchema("URL to navigate to."),
 			}, []string{"url"}),
 		},
@@ -264,7 +264,7 @@ func mcpTools() []mcpTool {
 			Title:       "Wait For Page Load",
 			Description: "Wait for a managed tab to reach a load state.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
 				"state": map[string]any{
 					"type":        "string",
 					"description": "Load state.",
@@ -278,19 +278,19 @@ func mcpTools() []mcpTool {
 			Title:       "Read Page Info",
 			Description: "Read title, URL, readyState, and body text from a managed tab.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
 			}, nil),
 		},
 		{
 			Name:        "cdp",
 			Title:       "Run CDP Command",
-			Description: "Run a Chrome DevTools Protocol command against a managed tab.",
+			Description: "Run a DevTools Protocol command against a managed tab.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
-				"method": stringSchema("Chrome DevTools Protocol method, for example Runtime.evaluate."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
+				"method": stringSchema("DevTools Protocol method, for example Runtime.evaluate."),
 				"params": map[string]any{
 					"type":        "object",
-					"description": "Chrome DevTools Protocol command parameters.",
+					"description": "DevTools Protocol command parameters.",
 					"default":     map[string]any{},
 				},
 			}, []string{"method"}),
@@ -300,7 +300,7 @@ func mcpTools() []mcpTool {
 			Title:       "Move Browser Cursor",
 			Description: "Move the browser cursor overlay inside a managed tab.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
 				"x":      numberSchema("Viewport x coordinate."),
 				"y":      numberSchema("Viewport y coordinate."),
 			}, []string{"x", "y"}),
@@ -310,7 +310,7 @@ func mcpTools() []mcpTool {
 			Title:       "Wait For File Chooser",
 			Description: "Wait for a managed tab to open a file chooser.",
 			InputSchema: objectSchema(map[string]any{
-				"tab_id": integerSchema("Optional Chrome tab id. Defaults to the current tab."),
+				"tab_id": integerSchema("Optional browser tab id. Defaults to the current tab."),
 			}, nil),
 		},
 		{
@@ -343,7 +343,7 @@ func mcpTools() []mcpTool {
 		{
 			Name:        "name_session",
 			Title:       "Name Browser Session",
-			Description: "Set the Chrome tab group title for the active browser session.",
+			Description: "Set the browser tab group title for the active browser session.",
 			InputSchema: objectSchema(map[string]any{
 				"name": stringSchema("Session group title, normally '<short task> - OBU'."),
 			}, []string{"name"}),

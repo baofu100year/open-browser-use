@@ -96,7 +96,7 @@ func newRootCommand() *cobra.Command {
 		newSimpleRPCCommand("ping", "ping", "Ping the browser backend"),
 		newSimpleRPCCommand("info", "getInfo", "Print browser backend info"),
 		newSimpleRPCCommand("tabs", "getTabs", "List session tabs"),
-		newSimpleRPCCommand("user-tabs", "getUserTabs", "List user Chrome tabs"),
+		newSimpleRPCCommand("user-tabs", "getUserTabs", "List user browser tabs"),
 		newHistoryCommand(),
 		newClaimTabCommand(),
 		newFinalizeTabsCommand(),
@@ -163,11 +163,11 @@ func newSetupCommand() *cobra.Command {
 			return renderStoreSetupResult(cmd.OutOrStdout(), result, status)
 		},
 	}
-	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
+	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
-	cmd.Flags().StringVar(&externalExtensionOutput, "external-extension-output", "", "Chrome external extension JSON output path")
-	cmd.Flags().StringVar(&browser, "browser", "", "browser to register with Chrome Web Store setup (chrome, chrome-beta, or edge; edge is best-effort)")
-	cmd.Flags().BoolVar(&noOpen, "no-open", false, "register Chrome integration without opening the Chrome Web Store page")
+	cmd.Flags().StringVar(&externalExtensionOutput, "external-extension-output", "", "browser external extension JSON output path")
+	cmd.Flags().StringVar(&browser, "browser", "", "browser to register with extension store setup (chrome, chrome-beta, or edge; edge is best-effort)")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "register browser integration without opening the extension store page")
 	cmd.AddCommand(newSetupBetaCommand())
 	return cmd
 }
@@ -243,11 +243,11 @@ func newSetupBetaCommand() *cobra.Command {
 			}, status)
 		},
 	}
-	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
+	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&zipPath, "zip", "", "existing extension zip path; defaults to the latest GitHub Release zip")
 	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
-	cmd.Flags().BoolVar(&noOpen, "no-open", false, "download and unpack the extension without opening Chrome")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "download and unpack the extension without opening the browser")
 	return cmd
 }
 
@@ -256,7 +256,7 @@ func newManifestCommand() *cobra.Command {
 	var hostPath string
 	cmd := &cobra.Command{
 		Use:   "manifest",
-		Short: "Print a Chrome native messaging host manifest",
+		Short: "Print a native messaging host manifest",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			manifest, err := nativeManifest(extensionID, hostPath)
@@ -266,7 +266,7 @@ func newManifestCommand() *cobra.Command {
 			return writeJSON(manifest)
 		},
 	}
-	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
+	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
 	cmd.Flags().StringVar(&hostPath, "path", "", "native host path written to manifest; defaults to the stable host link")
 	return cmd
 }
@@ -278,7 +278,7 @@ func newInstallManifestCommand() *cobra.Command {
 	var browser string
 	cmd := &cobra.Command{
 		Use:   "install-manifest",
-		Short: "Install the Chrome native messaging host manifest",
+		Short: "Install the native messaging host manifest",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			path, err := installNativeManifestForBrowser(extensionID, binaryPath, outputPath, browser)
@@ -289,7 +289,7 @@ func newInstallManifestCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "Chrome extension id for allowed_origins")
+	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&outputPath, "output", "", "native host manifest output path")
 	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
@@ -453,7 +453,7 @@ func renderStartupStatus(writer io.Writer) error {
 func renderStoreSetupResult(writer io.Writer, result setupResult, status browserExtensionStatus) error {
 	fmt.Fprintln(writer, "✅ Open Browser Use setup")
 	fmt.Fprintf(writer, "1. ✅ Registered native host\n   %s\n", result.NativeManifestPath)
-	fmt.Fprintf(writer, "2. ✅ Requested Chrome extension install\n   Extension id: %s\n   Chrome install file: %s\n", defaultChromeExtensionID, result.ExternalExtensionPath)
+	fmt.Fprintf(writer, "2. ✅ Requested browser extension install\n   Extension id: %s\n   Browser install file: %s\n", defaultChromeExtensionID, result.ExternalExtensionPath)
 	if result.OpenedStore {
 		fmt.Fprintf(writer, "3. ✅ Opened Chrome Web Store\n   %s\n", result.StoreURL)
 	} else if result.StoreOpenError != "" {
@@ -1123,7 +1123,7 @@ func addSocketFlags(cmd *cobra.Command, options *socketOptions) {
 	cmd.Flags().DurationVar(&options.timeout, "timeout", 10*time.Second, "request timeout")
 	cmd.Flags().StringVar(&options.sessionID, "session-id", options.sessionID, "browser session id used for tab grouping and cleanup")
 	cmd.Flags().StringVar(&options.browser, "browser", "", "browser selector (chrome, chrome-beta, bitbrowser, or display name)")
-	cmd.Flags().StringVar(&options.profile, "profile", "", "Chrome profile selector (directory name like \"Default\" / \"Profile 1\" or display name like \"Eva\")")
+	cmd.Flags().StringVar(&options.profile, "profile", "", "browser profile selector (directory name like \"Default\" / \"Profile 1\" or display name like \"Eva\")")
 }
 
 func newCallCommand() *cobra.Command {
@@ -1250,7 +1250,7 @@ func newClaimTabCommand() *cobra.Command {
 	var tabID int
 	cmd := &cobra.Command{
 		Use:   "claim-tab",
-		Short: "Claim an existing Chrome tab",
+		Short: "Claim an existing browser tab",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if tabID <= 0 {
@@ -1260,7 +1260,7 @@ func newClaimTabCommand() *cobra.Command {
 		},
 	}
 	addSocketFlags(cmd, &options)
-	cmd.Flags().IntVar(&tabID, "tab-id", 0, "Chrome tab id to claim")
+	cmd.Flags().IntVar(&tabID, "tab-id", 0, "browser tab id to claim")
 	return cmd
 }
 
@@ -1310,7 +1310,7 @@ func newCdpCommand() *cobra.Command {
 	var commandParamsJSON string
 	cmd := &cobra.Command{
 		Use:   "cdp",
-		Short: "Run a Chrome DevTools Protocol command",
+		Short: "Run a DevTools Protocol command",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if method == "" {
@@ -1334,8 +1334,8 @@ func newCdpCommand() *cobra.Command {
 	}
 	addSocketFlags(cmd, &options)
 	cmd.Flags().IntVar(&tabID, "tab-id", 0, "optional tab id target")
-	cmd.Flags().StringVar(&method, "method", "", "Chrome DevTools Protocol method")
-	cmd.Flags().StringVar(&commandParamsJSON, "params", "{}", "Chrome DevTools Protocol command params")
+	cmd.Flags().StringVar(&method, "method", "", "DevTools Protocol method")
+	cmd.Flags().StringVar(&commandParamsJSON, "params", "{}", "DevTools Protocol command params")
 	return cmd
 }
 
@@ -1503,7 +1503,7 @@ func newProfilesCommand() *cobra.Command {
 	var socketDir string
 	cmd := &cobra.Command{
 		Use:   "profiles",
-		Short: "List Chrome profiles that have the Open Browser Use extension installed",
+		Short: "List browser profiles that have the Open Browser Use extension installed",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			profiles, err := listInstalledChromeProfiles()
@@ -2844,7 +2844,7 @@ func defaultChromeExternalExtensionPath(extensionID string) (string, error) {
 func defaultChromeExternalExtensionPathForBrowser(extensionID string, browserSelector string) (string, error) {
 	filename := strings.TrimSpace(extensionID) + ".json"
 	if filename == ".json" {
-		return "", errors.New("Chrome extension id is empty")
+		return "", errors.New("browser extension id is empty")
 	}
 	switch runtime.GOOS {
 	case "darwin":
@@ -2872,7 +2872,7 @@ func defaultChromeExternalExtensionPathForBrowser(extensionID string, browserSel
 		}
 		return `HKCU\Software\` + vendorProduct + `\Extensions\` + strings.TrimSpace(extensionID), nil
 	default:
-		return "", fmt.Errorf("Chrome external extension setup is not implemented for %s", runtime.GOOS)
+		return "", fmt.Errorf("browser external extension setup is not implemented for %s", runtime.GOOS)
 	}
 }
 
@@ -3445,7 +3445,7 @@ func openChromeExtensionsPage(browserSelector string) error {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", "chrome://extensions/")
 	default:
-		return fmt.Errorf("opening Chrome extensions page is not implemented for %s", runtime.GOOS)
+		return fmt.Errorf("opening browser extensions page is not implemented for %s", runtime.GOOS)
 	}
 	if err := cmd.Start(); err != nil {
 		return err
