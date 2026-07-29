@@ -1,13 +1,13 @@
 ---
 name: open-browser-use
-description: Platform-neutral guidance for using Open Browser Use, the open-source Chrome automation stack for AI agents. Use when an agent needs to install, verify, troubleshoot, or operate Open Browser Use through its browser extension, native CLI, JavaScript SDK, Python SDK, Go SDK, or Browser Use style JSON-RPC methods; use for tasks involving real Chrome tabs, user tab claiming, CDP commands, downloads, file choosers, clipboard helpers, or session cleanup.
+description: Platform-neutral guidance for using Open Browser Use, the open-source browser automation stack for AI agents. Use when an agent needs to install, verify, troubleshoot, or operate Open Browser Use through its browser extension, native CLI, JavaScript SDK, Python SDK, Go SDK, or Browser Use style JSON-RPC methods; use for tasks involving real browser tabs, user tab claiming, CDP commands, downloads, file choosers, clipboard helpers, or session cleanup.
 ---
 
 # Open Browser Use
 
 ## Overview
 
-Open Browser Use connects an MV3 Chrome extension, a local native messaging host, a CLI, SDKs, and an optional stdio MCP server so agents can automate a real Chrome profile. It is not Codex.app-specific; adapt the commands, MCP config, and SDK examples to the agent runtime you are operating in.
+Open Browser Use connects an MV3 browser extension, a local native messaging host, a CLI, and SDKs so agents can automate a real browser profile. It is not Codex.app-specific; adapt the commands and SDK examples to the agent runtime you are operating in.
 
 ## Core Workflow
 
@@ -18,15 +18,14 @@ Open Browser Use connects an MV3 Chrome extension, a local native messaging host
 5. Before opening a new tab, run `user-tabs` / `user_tabs` and check whether the task continues from an existing tab, including tabs in `✅ Open Browser Use` or an earlier `handoff` task group. If the URL/title/group clearly matches the current task, claim that tab and continue from it instead of opening a duplicate. When verifying or accepting a local change, this also covers a dev server tab the user already has open (for example `localhost`, `127.0.0.1`, or a `*.local` / `*.test` host): claim and reuse it rather than opening a second copy of the same app.
 6. Use the CLI for simple inspection or one-shot actions: `info`, `tabs`, `user-tabs`, `history`, `open-tab`, `navigate`, `cdp`, and `call`.
 7. Use `open-browser-use run` / `obu run` for CLI-level multi-step orchestration when a small line-oriented action plan is enough and writing SDK code would be unnecessary.
-8. If the surrounding agent runtime supports local MCP servers, configure `obu mcp` and call the exposed browser tools directly. Use the `run_action_plan` MCP tool for the same line-oriented orchestration from MCP. Read [references/sdk-and-protocol.md](references/sdk-and-protocol.md).
-9. Use the JavaScript, Python, or Go SDK for larger multi-step workflows, event subscriptions, richer control flow, or when the surrounding agent runtime already runs code. Read [references/sdk-and-protocol.md](references/sdk-and-protocol.md).
-10. Before ending browser work, release or keep session tabs with `open-browser-use finalize-tabs --session-id "$OBU_SESSION_ID" --keep '<json-array>'`, the MCP `finalize_tabs` tool, or the SDK `finalizeTabs` / `finalize_tabs` / `FinalizeTabs` method.
-11. If communication fails after setup, read [references/troubleshooting.md](references/troubleshooting.md).
+8. Use the JavaScript, Python, or Go SDK for larger multi-step workflows, event subscriptions, richer control flow, or when the surrounding agent runtime already runs code. Read [references/sdk-and-protocol.md](references/sdk-and-protocol.md).
+9. Before ending browser work, release or keep session tabs with `open-browser-use finalize-tabs --session-id "$OBU_SESSION_ID" --keep '<json-array>'` or the SDK `finalizeTabs` / `finalize_tabs` / `FinalizeTabs` method.
+10. If communication fails after setup, read [references/troubleshooting.md](references/troubleshooting.md).
 
 ## Operating Rules
 
-- Treat the browser as the user's real Chrome profile. Do not inspect cookies, passwords, session stores, or unrelated browser data.
-- Ask the user before installing the extension, opening Chrome for them, enabling extension permissions, uploading local files, reading/writing clipboard data, submitting forms, purchasing, deleting, sending, or making other externally visible changes.
+- Treat the browser as the user's real browser profile. Do not inspect cookies, passwords, session stores, or unrelated browser data.
+- Ask the user before installing the extension, opening the browser for them, enabling extension permissions, uploading local files, reading/writing clipboard data, submitting forms, purchasing, deleting, sending, or making other externally visible changes.
 - Do not assume Codex.app helpers, Node REPL globals, or a bundled plugin UI are available. Use the installed `open-browser-use` / `obu` CLI or the published SDKs.
 - Do not guess tab ids. List tabs first, then use ids returned by `tabs`, `user-tabs`, `open-tab`, or SDK calls.
 - Prefer `claim-tab` / `claimUserTab` for existing user tabs. Claiming should be based on the current `user-tabs` result and visible evidence such as URL, title, recency, or group.
@@ -34,7 +33,7 @@ Open Browser Use connects an MV3 Chrome extension, a local native messaging host
 - Do not claim unrelated deliverable tabs just because they are in `✅ Open Browser Use`. If several tabs plausibly match, prefer the most recent exact URL/title match; ask the user when the match is ambiguous.
 - When verifying or accepting a local code change, prefer reusing a dev server tab the user already has open (matching host, port, and app, such as `localhost:<port>`) over opening a new one. Match on host, port, and path or title; if several plausibly match or the match is ambiguous, ask the user instead of opening a duplicate.
 - Use `--socket` only when the user or runtime provides an explicit socket. Otherwise let the CLI and SDKs discover the active socket registry.
-- Do not rely on the CLI fallback session `obu-cli` for agent tasks. Always pass a task-unique `--session-id` to CLI and MCP commands, or set `sessionId` / `session_id` / `SessionID` in SDK clients. The fallback exists for quick manual use and can reuse stale task groups across unrelated agent sessions.
+- Do not rely on the CLI fallback session `obu-cli` for agent tasks. Always pass a task-unique `--session-id` to CLI commands, or set `sessionId` / `session_id` / `SessionID` in SDK clients. The fallback exists for quick manual use and can reuse stale task groups across unrelated agent sessions.
 - Direct CLI subcommands and `open-browser-use run` can share the same browser session only when they use the same explicit `--session-id`. Finalize that same session before ending browser work.
 - Use `call --method <method> --params '<json>'` only when no safer convenience command or SDK wrapper exists.
 
@@ -60,7 +59,7 @@ than silently picking whatever window happens to be active.
    `bitbrowser:<instance>:Default`.
 
 2. If exactly one target is installed and connected, proceed without asking.
-   If it is installed but not connected, ask the user to open Chrome on that
+   If it is installed but not connected, ask the user to open that
    browser/profile before running browser commands.
 
 3. If multiple targets are installed and the user did not already specify
@@ -73,7 +72,7 @@ than silently picking whatever window happens to be active.
    browser/profile.
 
 5. After the user has chosen, pass `--browser <selector>` and, when needed,
-   `--profile <selector>` to every CLI / MCP command for the rest of the task.
+   `--profile <selector>` to every CLI command for the rest of the task.
    Browser selectors accept ids such as `chrome`, `chrome-beta`, `edge`,
    `bitbrowser`, browser display names, or a BitBrowser instance id. Profile
    selectors accept either the directory name (`Default`, `Profile 1`) or the
@@ -87,18 +86,7 @@ than silently picking whatever window happens to be active.
    which targets are currently connected. Ask the user to open the chosen
    browser/profile, then retry; do not silently fall back to a different target.
 
-7. For MCP, lock the browser/profile at server start:
-
-   ```toml
-   [mcp_servers.open_browser_use]
-   command = "obu"
-   args = ["mcp", "--session-id", "obu-<task-id>", "--browser", "<browser>", "--profile", "<profile>"]
-   ```
-
-   Do not pass browser/profile as per-tool-call arguments — the MCP server
-   applies the start-time selectors to every call.
-
-8. Do not remember the user's browser/profile choice across unrelated tasks. A
+7. Do not remember the user's browser/profile choice across unrelated tasks. A
    future task may belong to a different target; ask again rather than assuming.
 
 ## Common CLI Actions
@@ -135,27 +123,6 @@ default tab for later tab-scoped actions such as `wait-load`, `page-info`,
 `navigate`, `cdp`, `move-mouse`, and `wait-file-chooser`.
 
 Use `obu` as the short alias when available.
-
-## MCP Usage
-
-For runtimes that can launch local MCP servers over stdio, use:
-
-```toml
-[mcp_servers.open_browser_use]
-command = "obu"
-args = ["mcp", "--session-id", "obu-<task-or-conversation-id>"]
-```
-
-Use a fresh `--session-id` value per agent task or conversation. If the runtime
-has a stable conversation/session id, derive the MCP `--session-id` from it.
-
-The MCP server exposes tools including `user_tabs`, `open_tab`, `claim_tab`,
-`navigate`, `wait_load`, `page_info`, `cdp`, `history`, `run_action_plan`,
-`finalize_tabs`, and unrestricted `call`.
-
-Use `run_action_plan` when the runtime wants to execute the same compact action
-plan format available through `open-browser-use run` without shelling out for
-each individual browser operation.
 
 ## Tab Lifecycle
 

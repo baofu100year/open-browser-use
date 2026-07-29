@@ -4,17 +4,17 @@ Read this reference when the task requires multi-step automation, integration in
 
 ## Connection Model
 
-The Chrome extension starts the native host through Chrome Native Messaging. The native host exposes a local socket and writes the active socket registry so the CLI and SDKs can discover it.
+The browser extension starts the native host through native messaging. The native host exposes a local socket and writes the active socket registry so the CLI and SDKs can discover it.
 
 Default route:
 
 ```text
 agent runtime
-  -> open-browser-use CLI, MCP server, or SDK
+  -> open-browser-use CLI or SDK
   -> active Open Browser Use socket
   -> native messaging host
-  -> Chrome extension
-  -> Chrome tabs / debugger / history / downloads
+  -> browser extension
+  -> browser tabs / debugger / history / downloads
 ```
 
 Pass an explicit socket only when the runtime provides one:
@@ -31,9 +31,9 @@ Use a unique browser session id for each agent task or conversation. Prefer a
 stable session/conversation id from the surrounding runtime when it exists;
 otherwise create a short unique id such as `obu-<task-slug>-<timestamp>`.
 
-Pass that same id through every CLI command, MCP server, or SDK client used for
+Pass that same id through every CLI command or SDK client used for
 the task. Do not rely on the CLI fallback `obu-cli` in agent workflows; it is a
-manual convenience fallback and can reuse stale Chrome tab groups from unrelated
+manual convenience fallback and can reuse stale browser tab groups from unrelated
 tasks.
 
 Install the SDK package from the package registry for your runtime:
@@ -268,31 +268,7 @@ with `#`, shell-like quotes, shared session/turn, and a default tab set by
 `wait-load`, `page-info`, `cdp`, `move-mouse`, `wait-file-chooser`,
 `set-file-chooser-files`, `finalize-tabs`, `turn-ended`, and `call`.
 
-## MCP Server
-
-Use the stdio MCP server when the surrounding runtime supports local MCP tools:
-
-```toml
-[mcp_servers.open_browser_use]
-command = "obu"
-args = ["mcp", "--session-id", "obu-<task-or-conversation-id>"]
-```
-
-`obu mcp` speaks newline-delimited JSON-RPC on stdin/stdout. It handles
-`initialize`, `ping`, `tools/list`, and `tools/call`, and exposes tools that
-mirror the CLI action surface:
-
-- `ping`, `info`, `tabs`, `user_tabs`, `history`
-- `open_tab`, `claim_tab`, `navigate`, `wait_load`, `page_info`
-- `cdp`, `move_mouse`, `wait_file_chooser`, `set_file_chooser_files`
-- `name_session`, `finalize_tabs`, `turn_ended`, `call`, `run_action_plan`
-
-Pass `--socket` or `--socket-dir` in the MCP `args` only when the runtime needs
-an explicit Open Browser Use socket. Otherwise the server uses the same socket
-discovery as the CLI. Pass a fresh `--session-id` for each agent task or
-conversation.
-
-SDK request escape hatch:
+## Core Methods:
 
 ```ts
 await browser.client.request("executeCdp", {

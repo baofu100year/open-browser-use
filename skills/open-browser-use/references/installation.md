@@ -4,7 +4,7 @@ Read this reference when the user asks to install, verify, repair, or explain Op
 
 ## Components
 
-- Chrome extension: the browser-side controller. Installing or enabling it may require the user to approve Chrome prompts.
+- Browser extension: the browser-side controller. Installing or enabling it may require the user to approve browser prompts.
 - Native host and CLI: the local `open-browser-use` binary, also exposed as `obu` when installed from supported packages.
 - SDKs: JavaScript, Python, and Go clients that connect to the active native host socket.
 
@@ -40,7 +40,7 @@ After installing the CLI, register the native messaging host and open the Chrome
 open-browser-use setup
 ```
 
-Ask the user to install or enable Open Browser Use from the opened store page. Chrome may ask the user to confirm, enable the extension, or restart. Do not bypass this user step.
+Ask the user to install or enable Open Browser Use from the opened store page. The browser may ask the user to confirm, enable the extension, or restart. Do not bypass this user step.
 
 For Chrome Beta, register that browser explicitly:
 
@@ -83,12 +83,12 @@ While the Chrome Web Store item is unavailable or pending review, use the releas
 open-browser-use setup beta
 ```
 
-This downloads the latest keyed `open-browser-use-chrome-extension-*.zip` from GitHub Releases and registers the native host for that stable extension id. It opens `chrome://extensions/` and reveals the ZIP in Finder or the system file manager only when the browser extension is missing or older than the CLI-expected version. Ask the user to enable Developer mode and drag that ZIP into the Chrome extensions page when setup prints that next step.
+This downloads the latest keyed `open-browser-use-chrome-extension-*.zip` from GitHub Releases and registers the native host for that stable extension id. It opens the browser's extensions page (e.g. `chrome://extensions/` or `edge://extensions/`) and reveals the ZIP in Finder or the system file manager only when the browser extension is missing or older than the CLI-expected version. Ask the user to enable Developer mode and drag that ZIP into the extensions page when setup prints that next step.
 
 For Chrome Beta, use `open-browser-use setup beta --browser chrome-beta`. For
 Edge, use `open-browser-use setup beta --browser edge`; unlike
 `setup --browser edge`, this path does not depend on any extension store and
-works the same way as it does for Chrome.
+works the same way as it does for other Chromium-based browsers.
 
 Repair only the native host manifest:
 
@@ -107,8 +107,8 @@ open-browser-use manifest
 
 ## Platform Notes
 
-- macOS and Windows can require the user to approve or enable the extension after Chrome sees it.
-- Linux external extension registration can require elevated permissions depending on Chrome installation paths.
+- macOS and Windows can require the user to approve or enable the extension after the browser sees it.
+- Linux external extension registration can require elevated permissions depending on browser installation paths.
 - Chrome native messaging host name is `com.ifuryst.open_browser_use.extension`. Edge uses the same host name and the same `chrome-extension://` origin scheme, since Edge is Chromium-based.
 - Edge is supported on Stable only (no Beta/Dev/Canary channel) on macOS, Windows, and Linux for profile discovery and native messaging manifest installation. External Extensions auto-install on Edge is best-effort only; see "Set Up A Browser" above.
 - On Linux, only Chrome and Edge have full `--browser` selector support (profile roots, native messaging manifest, and External Extensions paths). Chrome Beta and BitBrowser are not yet supported on Linux.
@@ -128,4 +128,4 @@ For one-off installation checks, a temporary session id is enough. Agent browser
 tasks should still create and reuse a task-unique session id before opening or
 claiming tabs.
 
-If `ping` cannot communicate with Chrome, ask the user whether Chrome is installed and running, whether the extension is enabled, and whether they approved any Chrome prompt. Then use [troubleshooting.md](troubleshooting.md).
+If `ping` cannot communicate with the browser, ask the user whether the browser is installed and running, whether the extension is enabled, and whether they approved any browser prompt. Then use [troubleshooting.md](troubleshooting.md).

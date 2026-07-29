@@ -17,11 +17,11 @@ Do not reuse the CLI fallback session for agent browser work.
 
 If these fail:
 
-1. Confirm Chrome is installed.
-2. Confirm Chrome is running.
+1. Confirm the browser is installed.
+2. Confirm the browser is running.
 3. Confirm the Open Browser Use extension is installed and enabled.
 4. Confirm the native host manifest is installed with `open-browser-use install-manifest` or rerun `open-browser-use setup`.
-5. Ask the user to approve any Chrome extension prompt.
+5. Ask the user to approve any browser extension prompt.
 
 Do not silently install, enable, or repair browser integration when the action needs user approval.
 
@@ -41,7 +41,7 @@ open-browser-use ping --socket-dir /tmp/open-browser-use
 open-browser-use ping --timeout 20s
 ```
 
-If no active host exists, opening Chrome with the extension enabled can allow Chrome to start the native host.
+If no active host exists, opening the browser with the extension enabled can allow the browser to start the native host.
 
 ## Extension Or Native Host Mismatch
 
@@ -67,7 +67,7 @@ open-browser-use setup --extension-id <chrome-extension-id>
 
 Use the Open Browser Use file chooser flow rather than native OS picker automation where possible.
 
-If Chrome blocks local file access for the extension, ask the user to open `chrome://extensions`, open Open Browser Use extension details, and enable file URL access if the task requires local file URLs.
+If the browser blocks local file access for the extension, ask the user to open the browser's extensions page (e.g. `chrome://extensions` or `edge://extensions`), open Open Browser Use extension details, and enable file URL access if the task requires local file URLs.
 
 ## Permission And Safety Issues
 
@@ -79,8 +79,8 @@ If Chrome blocks local file access for the extension, ask the user to open `chro
 
 Ask the user for help when:
 
-- Chrome is not installed.
-- Chrome is closed and opening it would interrupt their session.
-- Chrome requires extension confirmation or enablement.
+- The browser is not installed.
+- The browser is closed and opening it would interrupt their session.
+- The browser requires extension confirmation or enablement.
 - The page requires login, CAPTCHA, hardware key, payment confirmation, or another human-only step.
 - The requested browser action affects external systems.
