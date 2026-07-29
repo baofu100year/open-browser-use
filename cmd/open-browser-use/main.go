@@ -139,50 +139,21 @@ func runHost(socketDir string, socketPath string) error {
 func newSetupCommand() *cobra.Command {
 	extensionID := defaultChromeExtensionID
 	var binaryPath string
-	var externalExtensionOutput string
-	var browser string
-	var noOpen bool
-	cmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Register Chrome integration for Open Browser Use",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := setupChrome(extensionID, binaryPath, externalExtensionOutput, browser)
-			if err != nil {
-				return err
-			}
-			status := detectBrowserExtensionForBrowser(host.DefaultSocketDir, 700*time.Millisecond, browser)
-			shouldOpenStore := shouldOpenStoreSetup(status, noOpen)
-			if shouldOpenStore {
-				if err := openChromeWebStorePage(browser); err != nil {
-					result.StoreOpenError = err.Error()
-				} else {
-					result.OpenedStore = true
-				}
-			}
-			return renderStoreSetupResult(cmd.OutOrStdout(), result, status)
-		},
-	}
-	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
-	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
-	cmd.Flags().StringVar(&externalExtensionOutput, "external-extension-output", "", "browser external extension JSON output path")
-	cmd.Flags().StringVar(&browser, "browser", "", "browser to register with extension store setup (chrome, chrome-beta, or edge; edge is best-effort)")
-	cmd.Flags().BoolVar(&noOpen, "no-open", false, "register browser integration without opening the extension store page")
-	cmd.AddCommand(newSetupBetaCommand())
-	return cmd
-}
-
-func newSetupBetaCommand() *cobra.Command {
-	extensionID := defaultChromeExtensionID
-	var binaryPath string
 	var zipPath string
 	var browser string
-	var noOpen bool
 	cmd := &cobra.Command{
-		Use:   "beta",
-		Short: "Register the native host and prepare the beta extension package",
-		Args:  cobra.NoArgs,
+		Use:   "setup",
+		Short: "Download, unpack, and install the browser extension",
+		Long: `Download the latest extension release, register the native messaging host,
+and guide you through loading the unpacked extension in your browser.
+
+Requires developer mode to be enabled in the browser's extensions page.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Developer mode is required for loading unpacked extensions.
+			if !isDeveloperModeEnabled(browser) {
+				return fmt.Errorf("developer mode is not enabled for %s.\nPlease enable it at chrome://extensions (or edge://extensions) and retry.", browserDisplayName(browser))
+			}
 			resolvedZIPPath := zipPath
 			if resolvedZIPPath == "" {
 				var err error
@@ -201,53 +172,36 @@ func newSetupBetaCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			installZIPPath, err := writeBetaInstallZIP(unpackedPath, resolvedZIPPath)
-			if err != nil {
-				return err
-			}
 			effectiveExtensionID := extensionID
 			if !cmd.Flags().Changed("extension-id") {
 				effectiveExtensionID = unpackedExtensionID
 			}
 			if effectiveExtensionID != unpackedExtensionID {
-				return fmt.Errorf("--extension-id %s does not match keyed beta ZIP extension id %s", effectiveExtensionID, unpackedExtensionID)
+				return fmt.Errorf("--extension-id %s does not match keyed ZIP extension id %s", effectiveExtensionID, unpackedExtensionID)
 			}
 			manifestPath, err := installNativeManifestForBrowser(effectiveExtensionID, binaryPath, "", browser)
 			if err != nil {
 				return err
 			}
-			status := detectBrowserExtensionForBrowser(host.DefaultSocketDir, 700*time.Millisecond, browser)
-			status.InstallCommand = "open-browser-use setup beta"
-			if strings.TrimSpace(browser) != "" {
-				status.InstallCommand += " --browser " + browser
+			// Open the extensions page and reveal the unpacked folder for loading.
+			if err := openChromeExtensionsPage(browser); err != nil {
+				return err
 			}
-			status.UpgradeCommand = status.InstallCommand
-			shouldOpen := shouldOpenManualSetup(status, noOpen)
-			if shouldOpen {
-				if err := openChromeExtensionsPage(browser); err != nil {
-					return err
-				}
-				if err := revealFile(installZIPPath); err != nil {
-					return err
-				}
+			if err := revealFile(unpackedPath); err != nil {
+				return err
 			}
-			skillUpdate := maybeUpdateInstalledSkill()
-			return renderManualSetupResult(cmd.OutOrStdout(), manualSetupResult{
-				NativeManifestPath: manifestPath,
-				ExtensionID:        effectiveExtensionID,
-				ZIPPath:            installZIPPath,
-				UnpackedPath:       unpackedPath,
-				OpenedChrome:       shouldOpen,
-				OpenedFileManager:  shouldOpen,
-				SkillUpdate:        skillUpdate,
-			}, status)
+			fmt.Fprintf(cmd.OutOrStdout(), "✅ Extension ready.\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "   1. Native host registered: %s\n", manifestPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "   2. Extension unpacked: %s\n", unpackedPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "   3. Extension id: %s\n", effectiveExtensionID)
+			fmt.Fprintf(cmd.OutOrStdout(), "\nNext: Click \"Load unpacked\" in the extensions page and select the folder above.\n")
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&extensionID, "extension-id", defaultChromeExtensionID, "browser extension id for allowed_origins")
 	cmd.Flags().StringVar(&binaryPath, "path", "", "native host binary target for the stable host link")
 	cmd.Flags().StringVar(&zipPath, "zip", "", "existing extension zip path; defaults to the latest GitHub Release zip")
 	cmd.Flags().StringVar(&browser, "browser", "", "browser to register (chrome, chrome-beta, edge, bitbrowser, or BitBrowser instance id)")
-	cmd.Flags().BoolVar(&noOpen, "no-open", false, "download and unpack the extension without opening the browser")
 	return cmd
 }
 
@@ -434,7 +388,7 @@ func renderStartupStatus(writer io.Writer) error {
 	fmt.Fprintln(writer, "Next steps:")
 	if status.needsInstall() {
 		fmt.Fprintf(writer, "  1. Install the browser extension: %s\n", status.InstallCommand)
-		fmt.Fprintln(writer, "     If the Chrome Web Store item is unavailable, use: open-browser-use setup beta")
+		fmt.Fprintln(writer, "     If the Chrome Web Store item is unavailable, use: open-browser-use setup")
 		fmt.Fprintln(writer, "  2. Restart your browser if it asks you to enable the extension.")
 		fmt.Fprintln(writer, "  3. Verify the connection: open-browser-use info")
 		return nil
@@ -3448,6 +3402,66 @@ func macOSBrowserAppName(browserSelector string) string {
 		return "Google Chrome Beta"
 	}
 	return "Google Chrome"
+}
+
+// isDeveloperModeEnabled checks whether the browser has developer mode enabled
+// for extensions. It detects this by looking for unpacked extensions (location=4)
+// in the browser's Preferences, which can only be installed in developer mode.
+func isDeveloperModeEnabled(browserSelector string) bool {
+	prefsPath := browserPreferencesPath(browserSelector)
+	if prefsPath == "" {
+		return false
+	}
+	data, err := os.ReadFile(prefsPath)
+	if err != nil {
+		return false
+	}
+	var prefs map[string]any
+	if err := json.Unmarshal(data, &prefs); err != nil {
+		return false
+	}
+	ext, _ := prefs["extensions"].(map[string]any)
+	if ext == nil {
+		return false
+	}
+	settings, _ := ext["settings"].(map[string]any)
+	if settings == nil {
+		return false
+	}
+	// Unpacked extensions have location=4. If any are found, developer mode is on.
+	for _, v := range settings {
+		if info, ok := v.(map[string]any); ok {
+			if loc, ok := info["location"].(float64); ok && int(loc) == 4 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// browserDisplayName returns a human-readable name for the browser selector.
+func browserDisplayName(browserSelector string) string {
+	target := strings.TrimSpace(browserSelector)
+	switch target {
+	case "edge":
+		return "Microsoft Edge"
+	case "chrome-beta":
+		return "Google Chrome Beta"
+	case "chrome", "":
+		return "Google Chrome"
+	default:
+		return target
+	}
+}
+
+// browserPreferencesPath returns the path to the browser's Secure Preferences JSON file,
+// which contains extension installation state.
+func browserPreferencesPath(browserSelector string) string {
+	profileRoot, err := browserRootForInstallSelector(browserSelector)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(profileRoot.Root, "Default", "Secure Preferences")
 }
 
 func openChromeExtensionsPage(browserSelector string) error {
